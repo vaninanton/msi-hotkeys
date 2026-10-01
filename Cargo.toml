@@ -1,0 +1,21 @@
+[package]
+name = "msi-hotkeys"
+version = "0.1.0"
+edition = "2021"
+description = "Handler for the hardware buttons of an MSI GL72, replacing SCM.exe"
+publish = false
+
+[dependencies]
+anyhow = "1.0.104"
+chrono = "0.4.45"
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+hidapi = "2.6.7"
+serde = { version = "1.0.229", features = ["derive"] }
+tauri-winrt-notification = "0.8.1"
+tray-icon = "0.26.0"
+windows = { version = "0.62.2", features = ["Win32_System_Console", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Storage_FileSystem", "Win32_System_Threading"] }
+wmi = "0.18.4"
+
+[profile.release]
+lto = "thin"
+strip = true
