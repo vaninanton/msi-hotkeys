@@ -1,4 +1,5 @@
 /target
-/snapshots
-/design
-ec-timeline.csv
+
+# Выгрузка макета из Claude Design: работа по нему остановлена, в истории
+# не нужна. Сам архив лежит в Downloads.
+/docs/design

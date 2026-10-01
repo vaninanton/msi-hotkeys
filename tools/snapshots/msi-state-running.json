@@ -1,0 +1,706 @@
+{
+  "MSI_AP": [
+    {
+      "Active": true,
+      "AP": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_0"
+    },
+    {
+      "Active": true,
+      "AP": 20,
+      "InstanceName": "ACPI\\PNP0C14\\0_1"
+    },
+    {
+      "Active": true,
+      "AP": 78,
+      "InstanceName": "ACPI\\PNP0C14\\0_2"
+    },
+    {
+      "Active": true,
+      "AP": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_3"
+    },
+    {
+      "Active": true,
+      "AP": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_4"
+    },
+    {
+      "Active": true,
+      "AP": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_5"
+    },
+    {
+      "Active": true,
+      "AP": 47,
+      "InstanceName": "ACPI\\PNP0C14\\0_6"
+    },
+    {
+      "Active": true,
+      "AP": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_7"
+    }
+  ],
+  "MSI_CPU": [
+    {
+      "Active": true,
+      "CPU": 13,
+      "InstanceName": "ACPI\\PNP0C14\\0_0"
+    },
+    {
+      "Active": true,
+      "CPU": 58,
+      "InstanceName": "ACPI\\PNP0C14\\0_1"
+    },
+    {
+      "Active": true,
+      "CPU": 50,
+      "InstanceName": "ACPI\\PNP0C14\\0_2"
+    },
+    {
+      "Active": true,
+      "CPU": 100,
+      "InstanceName": "ACPI\\PNP0C14\\0_3"
+    },
+    {
+      "Active": true,
+      "CPU": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_4"
+    },
+    {
+      "Active": true,
+      "CPU": 60,
+      "InstanceName": "ACPI\\PNP0C14\\0_5"
+    },
+    {
+      "Active": true,
+      "CPU": 65,
+      "InstanceName": "ACPI\\PNP0C14\\0_6"
+    },
+    {
+      "Active": true,
+      "CPU": 70,
+      "InstanceName": "ACPI\\PNP0C14\\0_7"
+    },
+    {
+      "Active": true,
+      "CPU": 75,
+      "InstanceName": "ACPI\\PNP0C14\\0_8"
+    },
+    {
+      "Active": true,
+      "CPU": 75,
+      "InstanceName": "ACPI\\PNP0C14\\0_9"
+    },
+    {
+      "Active": true,
+      "CPU": 75,
+      "InstanceName": "ACPI\\PNP0C14\\0_10"
+    },
+    {
+      "Active": true,
+      "CPU": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_11"
+    },
+    {
+      "Active": true,
+      "CPU": 50,
+      "InstanceName": "ACPI\\PNP0C14\\0_12"
+    },
+    {
+      "Active": true,
+      "CPU": 56,
+      "InstanceName": "ACPI\\PNP0C14\\0_13"
+    },
+    {
+      "Active": true,
+      "CPU": 66,
+      "InstanceName": "ACPI\\PNP0C14\\0_14"
+    },
+    {
+      "Active": true,
+      "CPU": 76,
+      "InstanceName": "ACPI\\PNP0C14\\0_15"
+    },
+    {
+      "Active": true,
+      "CPU": 76,
+      "InstanceName": "ACPI\\PNP0C14\\0_16"
+    },
+    {
+      "Active": true,
+      "CPU": 76,
+      "InstanceName": "ACPI\\PNP0C14\\0_17"
+    },
+    {
+      "Active": true,
+      "CPU": 0,
+      "InstanceName": "ACPI\\PNP0C14\\0_18"
+    }
+  ],
+  "MSI_Device": [
+    {
+      "Active": true,
+      "Device": 75,
+      "InstanceName": "ACPI\\PNP0C14\\0_0"
+    },
+    {
+      "Active": true,
+      "Device": 11,
+      "InstanceName": "ACPI\\PNP0C14\\0_1"
+    },
+    {
+      "Active": true,
+      "Device": 128,
+      "InstanceName": "ACPI\\PNP0C14\\0_2"
+    },
+    {
+      "Active": true,
+      "Device": 192,
+      "InstanceName": "ACPI\\PNP0C14\\0_3"
+    }
+  ],
+  "MSI_Event": [],
+  "MSI_Master_Battery": [
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_0",
+      "Master_Battery": 9
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_1",
+      "Master_Battery": 3924
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_2",
+      "Master_Battery": 10800
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_3",
+      "Master_Battery": 392
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_4",
+      "Master_Battery": 224
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_5",
+      "Master_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_6",
+      "Master_Battery": 100
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_7",
+      "Master_Battery": 3512
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_8",
+      "Master_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_9",
+      "Master_Battery": 3512
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_10",
+      "Master_Battery": 12250
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_11",
+      "Master_Battery": 3056
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_12",
+      "Master_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_13",
+      "Master_Battery": 10
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_14",
+      "Master_Battery": 5
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_15",
+      "Master_Battery": 12300
+    }
+  ],
+  "MSI_Power": [
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_0",
+      "Power": 3
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_1",
+      "Power": 183
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_2",
+      "Power": 13
+    }
+  ],
+  "MSI_Slave_Battery": [
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_0",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_1",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_2",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_3",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_4",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_5",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_6",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_7",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_8",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_9",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_10",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_11",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_12",
+      "Slave_Battery": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_13",
+      "Slave_Battery": 0
+    }
+  ],
+  "MSI_Software": [
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_0",
+      "Software": 1
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_1",
+      "Software": 3
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_2",
+      "Software": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_3",
+      "Software": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_4",
+      "Software": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_5",
+      "Software": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_6",
+      "Software": 49
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_7",
+      "Software": 55
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_8",
+      "Software": 57
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_9",
+      "Software": 54
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_10",
+      "Software": 69
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_11",
+      "Software": 77
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_12",
+      "Software": 83
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_13",
+      "Software": 49
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_14",
+      "Software": 46
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_15",
+      "Software": 49
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_16",
+      "Software": 48
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_17",
+      "Software": 52
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_18",
+      "Software": 48
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_19",
+      "Software": 50
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_20",
+      "Software": 50
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_21",
+      "Software": 51
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_22",
+      "Software": 50
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_23",
+      "Software": 48
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_24",
+      "Software": 49
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_25",
+      "Software": 54
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_26",
+      "Software": 49
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_27",
+      "Software": 51
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_28",
+      "Software": 58
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_29",
+      "Software": 52
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_30",
+      "Software": 54
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_31",
+      "Software": 58
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_32",
+      "Software": 51
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_33",
+      "Software": 56
+    }
+  ],
+  "MSI_System": [
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_0",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_1",
+      "System": 2
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_2",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_3",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_4",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_5",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_6",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_7",
+      "System": 128
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_8",
+      "System": 2
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_9",
+      "System": 12
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_10",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_11",
+      "System": 3
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_12",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_13",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_14",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_15",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_16",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_17",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_18",
+      "System": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_19",
+      "System": 226
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_20",
+      "System": 0
+    }
+  ],
+  "MSI_VGA": [
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_0",
+      "VGA": 13
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_1",
+      "VGA": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_2",
+      "VGA": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_3",
+      "VGA": 100
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_4",
+      "VGA": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_5",
+      "VGA": 55
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_6",
+      "VGA": 60
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_7",
+      "VGA": 65
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_8",
+      "VGA": 70
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_9",
+      "VGA": 75
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_10",
+      "VGA": 75
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_11",
+      "VGA": 0
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_12",
+      "VGA": 50
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_13",
+      "VGA": 56
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_14",
+      "VGA": 66
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_15",
+      "VGA": 76
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_16",
+      "VGA": 86
+    },
+    {
+      "Active": true,
+      "InstanceName": "ACPI\\PNP0C14\\0_17",
+      "VGA": 86
+    }
+  ]
+}
