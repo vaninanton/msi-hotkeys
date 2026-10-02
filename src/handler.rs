@@ -60,7 +60,7 @@ fn handle(machine: &Machine, code: u32) {
             Err(e) => journal::append(&format!("{:26}FAILED to run {command}: {e:#}", "")),
         },
         // Nothing mapped yet, so the free button at least reports the machine.
-        None if code == buttons::CENTER => win::notify("msi-hotkeys", &status),
+        None if code == buttons::GAMING_CENTER => win::notify("msi-hotkeys", &status),
         None => {}
     }
 }

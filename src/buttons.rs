@@ -29,7 +29,10 @@ pub const ALL: [(u32, &str); 13] = [
     // know sit in 0xD0..0xD4 — so nothing suggests this code is shared, but the
     // machine's own mute key (Fn+Num0) has not been checked against it.
     (0x22_0004, "Cooler Boost"),
-    (0x22_0029, "Center key"), // "MSI M-Center main menu" in the kernel
+    // Labelled Gaming Center on this machine, between Cooler Boost and the power
+    // button. The kernel calls the same code CLAW_KEY_CENTER, "MSI M-Center main
+    // menu".
+    (0x22_0029, "Gaming Center"),
     (0x22_0021, "Volume down"),
     (0x22_0032, "Volume up"),
     // Not in the kernel's table at all. MSI's own software treats it as "launch
@@ -49,11 +52,11 @@ pub const ALL: [(u32, &str); 13] = [
     (0x22_4B57, "Camera (Fn+F6)"),
 ];
 
-/// The key next to the power button. It does nothing in hardware, which makes it
-/// a free button, so it gets the fallback behaviour. P1 is free in the same sense
-/// but has no fallback: one key reporting the machine is enough, and P1 is the
-/// one the user is expected to map.
-pub const CENTER: u32 = 0x22_0029;
+/// The Gaming Center key, between Cooler Boost and the power button. It does
+/// nothing in hardware, which makes it a free button, so it gets the fallback
+/// behaviour. P1 and ECO are free in the same sense but have no fallback: one key
+/// reporting the machine is enough, and P1 is the one the user is expected to map.
+pub const GAMING_CENTER: u32 = 0x22_0029;
 
 pub fn name(code: u32) -> &'static str {
     ALL.iter()
@@ -68,12 +71,12 @@ mod tests {
     #[test]
     fn names_known_codes_and_admits_the_rest() {
         assert_eq!(name(0x22_0004), "Cooler Boost");
-        assert_eq!(name(CENTER), "Center key");
+        assert_eq!(name(GAMING_CENTER), "Gaming Center");
         assert_eq!(name(0x00_0001), "unidentified");
     }
 
     #[test]
-    fn the_centre_key_is_in_the_table() {
-        assert!(ALL.iter().any(|(code, _)| *code == CENTER));
+    fn the_free_key_is_in_the_table() {
+        assert!(ALL.iter().any(|(code, _)| *code == GAMING_CENTER));
     }
 }
