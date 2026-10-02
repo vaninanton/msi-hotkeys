@@ -12,17 +12,18 @@
 //! `msi-wmi.c` — `0x08` is `WIND_KEY_TOUCHPAD` ("Fn+F3 touchpad toggle") and
 //! `0x57` is `WIND_KEY_CAMERA` ("Fn+F6 webcam toggle").
 //!
-//! Two devices turn up under a pair of codes each, and in both pairs the two
-//! differ by exactly bit 1 of that middle byte: `0x220208` against `0x220008`
-//! for the touchpad, `0x224B57` against `0x224957` for the camera. For the camera
-//! the middle byte is a snapshot of EC `0x2E`, the device-state byte, confirmed
-//! by six presses against the live byte. For the touchpad it is something else
-//! again — see docs/FINDINGS.md.
+//! Three keys turn up under a pair of codes each, and in every pair the two
+//! differ by exactly bit 1 of that middle byte: `0x220208`/`0x220008` for the
+//! touchpad, `0x220279`/`0x220079` for ECO, `0x224B57`/`0x224957` for the camera.
+//!
+//! For the camera that byte is a snapshot of EC `0x2E`, the device-state byte,
+//! confirmed by six presses against the live byte. For the other two it is
+//! something else, still unexplained — see docs/FINDINGS.md.
 
 /// Every button seen to raise an event, with the name where there is one. A
 /// device that appears under two codes is listed twice rather than masked: the
 /// meaning of the differing bit is still a guess, and a mask would bake it in.
-pub const ALL: [(u32, &str); 11] = [
+pub const ALL: [(u32, &str); 13] = [
     (0x22_0004, "Cooler Boost"),
     (0x22_0029, "Center key"), // "MSI M-Center main menu" in the kernel
     (0x22_0021, "Volume down"),
@@ -31,6 +32,11 @@ pub const ALL: [(u32, &str); 11] = [
     // the user's application", and nothing in hardware responds to it, so it is
     // the natural key to map in actions.txt.
     (0x22_006F, "P1 (Fn+F4)"),
+    // Marked with a battery and the word ECO. Five presses changed not one EC
+    // byte, so the hardware does nothing with it either: MSI's own software
+    // switched a Windows power plan. Another key free to map.
+    (0x22_0279, "ECO (Fn+F5)"),
+    (0x22_0079, "ECO (Fn+F5)"),
     (0x22_0062, "Brightness up"),
     (0x22_0063, "Brightness down"),
     (0x22_0208, "Touchpad (Fn+F3)"),
