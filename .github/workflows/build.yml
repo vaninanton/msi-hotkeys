@@ -41,6 +41,18 @@ jobs:
       # launched by cargo at all.
       - run: cargo test
 
+  # The floor in Cargo.toml is a claim, so it gets compiled rather than asserted.
+  # What sets it is `&raw mut` in win.rs: that syntax stabilised in 1.82. Without
+  # this job the number would be decoration — it was exactly that until someone
+  # asked what it meant.
+  msrv:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.82
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-targets
+
   build:
     runs-on: windows-latest
     needs: check
