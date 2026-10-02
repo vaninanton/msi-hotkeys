@@ -23,7 +23,7 @@
 /// Every button seen to raise an event, with the name where there is one. A
 /// device that appears under two codes is listed twice rather than masked: the
 /// meaning of the differing bit is still a guess, and a mask would bake it in.
-pub const ALL: [(u32, &str); 13] = [
+pub const ALL: [(u32, &str); 14] = [
     // A key of its own in the row beside the power button, not an Fn combination.
     // The kernel's table has no code ending in 0x04, and the mute keys it does
     // know sit in 0xD0..0xD4 — so nothing suggests this code is shared, but the
@@ -34,6 +34,7 @@ pub const ALL: [(u32, &str); 13] = [
     // menu".
     (0x22_0029, "Gaming Center"),
     (0x22_0021, "Volume down"),
+    (0x22_0023, "Mute (Fn+Num0)"),
     (0x22_0032, "Volume up"),
     // Not in the kernel's table at all. MSI's own software treats it as "launch
     // the user's application", and nothing in hardware responds to it, so it is

@@ -75,8 +75,18 @@ pub fn run(seconds: u64) -> Result<()> {
     Ok(())
 }
 
-/// One event as a line. Scan codes are what matters here, so they lead.
+/// One event as a line, stamped with the time.
+///
+/// The stamp is not decoration: without it a scan cannot be lined up against
+/// `events.log`, and the first run of this tool was misread for exactly that
+/// reason — four unexplained scan codes were attributed to the keys pressed last
+/// when the ACPI log showed four other keys pressed in the same minute.
 fn describe(event: &KeyEvent) -> String {
+    let now = chrono::Local::now().format("%H:%M:%S%.3f");
+    format!("{now}  {}", body(event))
+}
+
+fn body(event: &KeyEvent) -> String {
     match event {
         KeyEvent::Keyboard {
             make_code,
