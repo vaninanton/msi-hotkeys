@@ -1,8 +1,8 @@
 [package]
 name = "msi-hotkeys"
-version = "0.1.0"
+version = "0.9.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.90"
 description = "Handler for the hardware buttons of an MSI GL72 6QD, replacing the MSI SCM software"
 repository = "https://github.com/vaninanton/msi-hotkeys"
 license = "MIT"

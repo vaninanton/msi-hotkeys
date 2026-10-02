@@ -42,14 +42,16 @@ jobs:
       - run: cargo test
 
   # The floor in Cargo.toml is a claim, so it gets compiled rather than asserted.
-  # What sets it is `&raw mut` in win.rs: that syntax stabilised in 1.82. Without
-  # this job the number would be decoration — it was exactly that until someone
-  # asked what it meant.
+  # It was 1.82 — the version that stabilised the `&raw mut` this code uses — until
+  # this job was added and refused to build at all: cargo 1.82 cannot even parse
+  # the manifest of toml 1.1.6. The dependencies set the floor, not our code, and
+  # tray-icon 0.26 asks for the highest of them. Without this job the number was
+  # decoration, which is exactly what it turned out to be.
   msrv:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.82
+      - uses: dtolnay/rust-toolchain@1.90
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --all-targets
 
@@ -106,16 +108,28 @@ jobs:
           $hash = (Get-FileHash msi-hotkeys.exe -Algorithm SHA256).Hash.ToLower()
           "$hash  msi-hotkeys.exe" | Set-Content msi-hotkeys.exe.sha256
           $notes = @"
-          Only for MSI boards listed in ``model.rs``; on anything else the program refuses to start.
-          Needs administrator rights, and asks for them itself.
+          Обработчик аппаратных кнопок MSI — замена штатного SCM целиком, без ring-0 драйверов.
 
-          SHA-256: ``$hash``
+          **Только для платы MS-1796** (MSI GL72 6QD). Карта байтов EC снята с ACPI-таблиц одной
+          машины, и программа в один из этих байтов пишет, поэтому на незнакомой плате она
+          отказывается запускаться. Права администратора нужны и запрашиваются сами.
 
-          Built by GitHub Actions from ${{ github.sha }}. Verify the origin with:
+          ### Чего ожидать при первом запуске
+
+          Бинарь не подписан сертификатом, поэтому SmartScreen покажет «Windows protected your PC»:
+          «Подробнее» → «Выполнить в любом случае». Пара антивирусных движков может сработать
+          ложно — программа просит права администратора, пишет в контроллер и запускает команды
+          из ``actions.txt``, то есть делает ровно то, по чему эвристики узнают подозрительное.
+          Исходники открыты, а происхождение этого файла проверяемо:
 
           ``````
           gh attestation verify msi-hotkeys.exe --repo ${{ github.repository }}
           ``````
+
+          Проверка подтвердит, что файл собран GitHub Actions из коммита ${{ github.sha }},
+          а не на чьём-то рабочем столе. Воспроизводимости это не обещает — только происхождение.
+
+          SHA-256: ``$hash``
           "@
           gh release create ${{ github.ref_name }} `
             msi-hotkeys.exe msi-hotkeys.exe.sha256 `
