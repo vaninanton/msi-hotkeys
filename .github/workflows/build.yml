@@ -1,0 +1,112 @@
+# Checks, a release build, and a signed statement of where that build came from.
+#
+# The attestation is the point of the build job. `attest-build-provenance` signs,
+# through Sigstore, a statement that this exact binary was produced by this
+# workflow from this commit — so anyone who downloads the exe can check it came
+# from the source in this repository and not from somebody's desktop:
+#
+#     gh attestation verify msi-hotkeys.exe --repo <owner>/msi-hotkeys
+#
+# What it does not claim is a reproducible build: rebuilding will not give
+# byte-identical output, and the attestation says nothing about that. It
+# establishes origin, not repeatability.
+name: build
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+# Jobs widen this for themselves, and only as far as they need.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      # The lint levels live in Cargo.toml; this makes any of them fatal here.
+      - run: cargo clippy --all-targets -- -D warnings
+      # The tests are all on pure functions, so no MSI hardware is needed. They
+      # run on the debug profile deliberately: the release manifest asks for
+      # administrator rights, and a test binary that demands elevation cannot be
+      # launched by cargo at all.
+      - run: cargo test
+
+  build:
+    runs-on: windows-latest
+    needs: check
+    permissions:
+      contents: read
+      id-token: write # Sigstore needs to mint an OIDC token
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Needs rc.exe from the Windows SDK for the manifest, icon and version
+      # block; windows-latest has it.
+      - run: cargo build --release
+
+      - name: Report what was built
+        run: |
+          $exe = 'target/release/msi-hotkeys.exe'
+          "sha256: {0}" -f (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "size:   {0:N0} bytes" -f (Get-Item $exe).Length
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: target/release/msi-hotkeys.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msi-hotkeys
+          path: target/release/msi-hotkeys.exe
+          if-no-files-found: error
+
+  release:
+    runs-on: windows-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    # Confined to this job: nothing else here needs to write to the repository.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: msi-hotkeys
+
+      # The gh CLI ships on the runner, so the release needs no third-party
+      # action — which matters for a repository whose point is verifiable origin.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $hash = (Get-FileHash msi-hotkeys.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  msi-hotkeys.exe" | Set-Content msi-hotkeys.exe.sha256
+          $notes = @"
+          Only for MSI boards listed in ``model.rs``; on anything else the program refuses to start.
+          Needs administrator rights, and asks for them itself.
+
+          SHA-256: ``$hash``
+
+          Built by GitHub Actions from ${{ github.sha }}. Verify the origin with:
+
+          ``````
+          gh attestation verify msi-hotkeys.exe --repo ${{ github.repository }}
+          ``````
+          "@
+          gh release create ${{ github.ref_name }} `
+            msi-hotkeys.exe msi-hotkeys.exe.sha256 `
+            --repo ${{ github.repository }} `
+            --title "${{ github.ref_name }}" `
+            --notes $notes
