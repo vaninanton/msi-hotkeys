@@ -24,6 +24,14 @@ fn dash(label: &str) -> String {
     format!("{label}: —")
 }
 
+const fn on_off(on: bool) -> &'static str {
+    if on {
+        "вкл"
+    } else {
+        "выкл"
+    }
+}
+
 /// The six lines about the machine itself.
 fn machine_lines(ec: &Ec) -> [String; 6] {
     [
@@ -71,26 +79,27 @@ fn fan_line(ec: &Ec) -> String {
 }
 
 /// Only the parts the machine actually has, each with its state. Worth showing
-/// because the camera bit is the only indication the machine gives that the
-/// camera has been switched off in firmware.
+/// because these bits are the only indication the machine gives that the camera
+/// or the touchpad has been switched off underneath Windows.
 fn devices_line(ec: &Ec) -> String {
-    let (Some(state), Some(present)) = (ec.byte(&map::DEVICE_STATE), ec.byte(&map::DEVICE_PRESENT))
-    else {
-        return dash("Устройства");
-    };
+    let mut listed: Vec<String> = Vec::new();
 
-    let listed: Vec<String> = map::DEVICES
-        .iter()
-        .filter(|(mask, _)| present & mask != 0)
-        .map(|(mask, name)| {
-            let on = if state & mask == 0 {
-                "выкл"
-            } else {
-                "вкл"
-            };
-            format!("{name} {on}")
-        })
-        .collect();
+    if let (Some(state), Some(present)) =
+        (ec.byte(&map::DEVICE_STATE), ec.byte(&map::DEVICE_PRESENT))
+    {
+        listed.extend(
+            map::DEVICES
+                .iter()
+                .filter(|(mask, _)| present & mask != 0)
+                .map(|(mask, name)| format!("{name} {}", on_off(state & mask != 0))),
+        );
+    }
+
+    // The touchpad sits in a byte of its own, with no presence bit beside it, so
+    // it is read separately rather than through the mask table.
+    if let Some(on) = ec.bit(&map::TOUCHPAD, map::TOUCHPAD_ON) {
+        listed.push(format!("тачпад {}", on_off(on)));
+    }
 
     if listed.is_empty() {
         dash("Устройства")
@@ -268,7 +277,7 @@ mod tests {
             ("MSI_Software", Some(vec![1])),
             ("MSI_AP", Some(vec![0, 20, 137])),
             // Bluetooth, camera and WLAN present, the camera switched off.
-            ("MSI_Device", Some(vec![0x49, 0x4B])),
+            ("MSI_Device", Some(vec![0x49, 0x4B, 0x80])),
             // Bit 1 set: Turbo.
             ("MSI_System", Some(vec![0b010])),
             // Bit 0 set: following the curve.
@@ -310,8 +319,22 @@ mod tests {
         assert_eq!(mode, "Режим: Turbo");
         assert_eq!(
             devices,
-            "Устройства: Bluetooth вкл · камера выкл · WLAN вкл"
+            "Устройства: Bluetooth вкл · камера выкл · WLAN вкл · тачпад вкл"
         );
+    }
+
+    #[test]
+    fn the_touchpad_is_read_from_its_own_byte() {
+        // No presence bit sits beside it, so it is listed whenever it reads.
+        let ec = Ec::from_windows(vec![("MSI_Device", Some(vec![0x49, 0x4B, 0x00]))]);
+        assert_eq!(
+            devices_line(&ec),
+            "Устройства: Bluetooth вкл · камера выкл · WLAN вкл · тачпад выкл"
+        );
+
+        // And the other way round: the devices bytes missing must not hide it.
+        let ec = Ec::from_windows(vec![("MSI_Device", Some(vec![]))]);
+        assert_eq!(devices_line(&ec), "Устройства: —");
     }
 
     #[test]

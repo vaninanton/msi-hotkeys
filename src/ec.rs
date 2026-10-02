@@ -63,6 +63,16 @@ pub mod map {
     pub const DEVICE_STATE: Byte = Byte::new("MSI_Device", "Device", 0);
     /// EC `0x2F`: which of those parts the machine has at all.
     pub const DEVICE_PRESENT: Byte = Byte::new("MSI_Device", "Device", 1);
+    /// EC `0x2B` bit 7: the touchpad, named from behaviour rather than from a
+    /// source. Four slow presses of Fn+F3 flipped this bit each time, and an even
+    /// number of them left it back at `0x80`, which is the state the machine
+    /// normally runs in — so set means enabled.
+    ///
+    /// A faster burst of presses had left it alone, which is worth remembering
+    /// before concluding that a byte does not track something: the touchpad was
+    /// not toggling at that rate either.
+    pub const TOUCHPAD: Byte = Byte::new("MSI_Device", "Device", 2);
+    pub const TOUCHPAD_ON: i64 = 1 << 7;
 
     /// The fan reading, by behaviour rather than by name: it plateaus under
     /// Cooler Boost and slides back down afterwards through a dozen
