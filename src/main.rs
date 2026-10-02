@@ -94,9 +94,7 @@ const CPU_TEMPERATURE: Byte = Byte {
 /// `0x68` CPU temperature, `0x71` CPU fan, `0x80` GPU temperature, `0x89` GPU
 /// fan, `0x33` bit 0 the fan automatics.
 const FAN_AUTOMATICS: Byte = Byte { class: "MSI_CPU", property: "CPU", index: 0 };
-const CPU_FAN: Byte = Byte { class: "MSI_CPU", property: "CPU", index: 2 };
 const GPU_TEMPERATURE: Byte = Byte { class: "MSI_VGA", property: "VGA", index: 1 };
-const GPU_FAN: Byte = Byte { class: "MSI_VGA", property: "VGA", index: 2 };
 
 /// `MSI_Master_Battery` carries 16-bit words, not bytes: EC `0x31` holds the
 /// status bits and the rest are low/high pairs from `0x38` up.
@@ -429,7 +427,7 @@ struct Power {
 }
 
 /// How many lines the tray menu shows.
-const READING_LINES: usize = 10;
+const READING_LINES: usize = 9;
 
 /// The readings as separate lines, for the tray menu. In Russian, like
 /// everything else the user sees; the console and the log stay in English.
@@ -444,28 +442,34 @@ fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
             Some(false) => "Канал: не вооружён".to_string(),
             None => dash("Канал"),
         },
-        match (ec.byte(&CPU_TEMPERATURE), ec.byte(&CPU_FAN)) {
-            (Some(t), Some(f)) => format!("CPU: {t} °C · вентилятор {f}"),
-            (Some(t), None) => format!("CPU: {t} °C"),
-            _ => dash("CPU"),
-        },
+        ec.byte(&CPU_TEMPERATURE)
+            .map_or_else(|| dash("CPU"), |value| format!("CPU: {value} °C")),
         // The discrete card is powered down at idle, and then its temperature
         // reads zero rather than being absent.
-        match (ec.byte(&GPU_TEMPERATURE), ec.byte(&GPU_FAN)) {
-            (Some(0), _) => "GPU: спит".to_string(),
-            (Some(t), Some(f)) => format!("GPU: {t} °C · вентилятор {f}"),
-            (Some(t), None) => format!("GPU: {t} °C"),
-            _ => dash("GPU"),
+        match ec.byte(&GPU_TEMPERATURE) {
+            Some(0) => "GPU: спит".to_string(),
+            Some(value) => format!("GPU: {value} °C"),
+            None => dash("GPU"),
         },
-        // EC 0x33 bit 0, which msi-laptop documents as the fan automatics:
-        // zero means the controller drives the fan flat out.
-        match ec.byte(&FAN_AUTOMATICS) {
-            Some(value) if value & 1 == 0 => "Вентилятор: на максимуме".to_string(),
-            Some(_) => "Вентилятор: по кривой".to_string(),
-            None => dash("Вентилятор"),
+        // The fan value and, from EC 0x33 bit 0, whether the controller is
+        // following its curve — msi-laptop documents a zero there as the fan
+        // running flat out.
+        //
+        // The two addresses msi-ec calls the real fan speeds, 0x71 for the CPU
+        // and 0x89 for the GPU, read zero on this machine even with Cooler Boost
+        // audibly running, so they are not shown: a number that is always zero
+        // is worse than no number.
+        {
+            let mode = match ec.byte(&FAN_AUTOMATICS) {
+                Some(value) if value & 1 == 0 => " · на максимуме",
+                Some(_) => " · по кривой",
+                None => "",
+            };
+            ec.fan().map_or_else(
+                || format!("Вентилятор: —{mode}"),
+                |value| format!("Вентилятор: {value}{mode}"),
+            )
         },
-        ec.fan()
-            .map_or_else(|| dash("Тахометр"), |value| format!("Тахометр: {value}")),
         power.map_or_else(
             || dash("Питание"),
             |power| {
