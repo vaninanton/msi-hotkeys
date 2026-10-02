@@ -28,7 +28,7 @@ windows = { version = "0.62.2", features = [
 wmi = "0.18.4"
 
 [build-dependencies]
-winresource = "0.1.23"
+winresource = "0.1.31"
 
 [profile.release]
 lto = true
