@@ -31,6 +31,8 @@ mod journal;
 mod model;
 mod paths;
 mod readings;
+#[cfg(feature = "scan")]
+mod scan;
 mod tray;
 mod win;
 
@@ -47,25 +49,47 @@ msi-hotkeys — handler for the MSI hardware buttons (board MS-1796)
   msi-hotkeys --status     read-only screen, safe to run beside the handler
   msi-hotkeys --force      skip the hardware check (read docs/EC-MAP.md first)
   msi-hotkeys --help       this text
+";
 
-Needs administrator rights: the ACPI-WMI classes refuse reads without them.
+/// Only in a build made with `--features scan`.
+#[cfg(feature = "scan")]
+const SCAN_USAGE: &str = "\
+  msi-hotkeys --scan [s]   log raw keyboard input for s seconds, then stop
 ";
 
 enum Mode {
     Tray,
     Console,
     Status,
+    /// Reads the keyboard rather than the controller, so it needs none of the
+    /// checks the other modes do. Present only in a `scan` build.
+    #[cfg(feature = "scan")]
+    Scan(u64),
 }
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let given = |name: &str| args.iter().any(|arg| arg == name);
 
+    #[cfg(feature = "scan")]
+    let scan = args.iter().position(|arg| arg == "--scan").map(|at| {
+        args.get(at + 1)
+            .and_then(|next| next.parse().ok())
+            .unwrap_or(scan::DEFAULT_SECONDS)
+    });
+
     let mode = if given("--status") {
         Mode::Status
     } else if given("--console") {
         Mode::Console
     } else {
+        #[cfg(feature = "scan")]
+        if let Some(seconds) = scan {
+            Mode::Scan(seconds)
+        } else {
+            Mode::Tray
+        }
+        #[cfg(not(feature = "scan"))]
         Mode::Tray
     };
 
@@ -77,7 +101,18 @@ fn main() -> Result<()> {
 
     if given("--help") {
         print!("{USAGE}");
+        #[cfg(feature = "scan")]
+        print!("{SCAN_USAGE}");
+        println!();
+        println!("Needs administrator rights: the ACPI-WMI classes refuse reads without them.");
         return Ok(());
+    }
+
+    // Reads nothing from the controller, so the hardware check and the access
+    // check below do not apply to it.
+    #[cfg(feature = "scan")]
+    if let Mode::Scan(seconds) = mode {
+        return scan::run(seconds);
     }
 
     let identity = Identity::read()?;
@@ -122,5 +157,7 @@ fn main() -> Result<()> {
         }
         Mode::Tray => tray::run(),
         Mode::Status => unreachable!("handled above"),
+        #[cfg(feature = "scan")]
+        Mode::Scan(_) => unreachable!("handled above"),
     }
 }

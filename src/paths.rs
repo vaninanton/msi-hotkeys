@@ -17,3 +17,9 @@ pub fn actions() -> PathBuf {
 pub fn log() -> PathBuf {
     dir().join("events.log")
 }
+
+/// Only written by `--scan`, and only in a build that has that feature.
+#[cfg(feature = "scan")]
+pub fn keys() -> PathBuf {
+    dir().join("keys.log")
+}

@@ -44,19 +44,22 @@ pub const ALL: [(u32, &str); 13] = [
     // switched a Windows power plan. Another key free to map.
     (0x22_0279, "ECO (Fn+F5)"),
     (0x22_0079, "ECO (Fn+F5)"),
-    (0x22_0062, "Brightness up"),
-    (0x22_0063, "Brightness down"),
+    (0x22_0062, "Brightness down"),
+    (0x22_0063, "Brightness up"),
     (0x22_0208, "Touchpad (Fn+F3)"),
     (0x22_0008, "Touchpad (Fn+F3)"),
     (0x22_4957, "Camera (Fn+F6)"),
     (0x22_4B57, "Camera (Fn+F6)"),
 ];
 
-/// The Gaming Center key, between Cooler Boost and the power button. It does
-/// nothing in hardware, which makes it a free button, so it gets the fallback
-/// behaviour. P1 and ECO are free in the same sense but have no fallback: one key
-/// reporting the machine is enough, and P1 is the one the user is expected to map.
-pub const GAMING_CENTER: u32 = 0x22_0029;
+/// The keys the hardware does nothing with, so they are free for software. Until
+/// `actions.txt` maps one, a press on either reports the machine in a toast; ECO
+/// is free in the same sense but stays silent, because two keys saying the same
+/// thing is enough.
+pub const FREE: [u32; 2] = [
+    0x22_0029, // Gaming Center, between Cooler Boost and the power button
+    0x22_006F, // P1 (Fn+F4)
+];
 
 pub fn name(code: u32) -> &'static str {
     ALL.iter()
@@ -71,12 +74,14 @@ mod tests {
     #[test]
     fn names_known_codes_and_admits_the_rest() {
         assert_eq!(name(0x22_0004), "Cooler Boost");
-        assert_eq!(name(GAMING_CENTER), "Gaming Center");
+        assert_eq!(name(0x22_0029), "Gaming Center");
         assert_eq!(name(0x00_0001), "unidentified");
     }
 
     #[test]
-    fn the_free_key_is_in_the_table() {
-        assert!(ALL.iter().any(|(code, _)| *code == GAMING_CENTER));
+    fn every_free_key_is_in_the_table() {
+        for code in FREE {
+            assert!(ALL.iter().any(|(known, _)| *known == code), "{code:#X}");
+        }
     }
 }

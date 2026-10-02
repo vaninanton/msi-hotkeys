@@ -23,9 +23,18 @@ windows = { version = "0.62.2", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
     "Win32_System_Threading",
+    "Win32_UI_Input",
     "Win32_UI_WindowsAndMessaging",
 ] }
 wmi = "0.18.4"
+
+[features]
+# Keyboard capture, for identifying the keys that raise no ACPI-WMI event. Off by
+# default on purpose: the published binary should carry no such code at all. A
+# tray program that asks for administrator rights and reads keystrokes looks like
+# a keylogger whether or not it is one, and heuristic scanners are right to say
+# so. Build with `--features scan` when a measurement is needed.
+scan = []
 
 [build-dependencies]
 winresource = "0.1.23"
