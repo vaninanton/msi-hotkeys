@@ -28,7 +28,8 @@ use std::fs::{create_dir_all, read_to_string, write, OpenOptions};
 use std::io::Write as _;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
@@ -81,15 +82,6 @@ const CPU_TEMPERATURE: Byte = Byte {
     class: "MSI_CPU",
     property: "CPU",
     index: 1,
-};
-
-/// `MSI_AP[6]` moves on its own in a range that looks like a temperature, but
-/// what it measures is not established. Shown raw and labelled as unidentified,
-/// because that is the state of the knowledge about it.
-const UNNAMED_SENSOR: Byte = Byte {
-    class: "MSI_AP",
-    property: "AP",
-    index: 6,
 };
 
 /// `MSI_AP[2]` is the fan tachometer. It never holds still, and its unit is
@@ -399,9 +391,9 @@ struct Power {
     percent: Option<u16>,
 }
 
-/// How many lines the tray menu shows: the channel, three EC readings and three
+/// How many lines the tray menu shows: the channel, two EC readings and three
 /// about power.
-const READING_LINES: usize = 7;
+const READING_LINES: usize = 6;
 
 /// The readings as separate lines, for the tray menu. In Russian, like
 /// everything else the user sees; the console and the log stay in English.
@@ -420,10 +412,6 @@ fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
             .map_or_else(|| dash("CPU"), |value| format!("CPU: {value} °C")),
         ec.fan()
             .map_or_else(|| dash("Вентилятор"), |value| format!("Вентилятор: {value}")),
-        ec.byte(&UNNAMED_SENSOR).map_or_else(
-            || dash("Датчик AP[6]"),
-            |value| format!("Датчик AP[6]: {value} — не определён"),
-        ),
         power.map_or_else(
             || dash("Питание"),
             |power| {
@@ -595,13 +583,20 @@ fn run_in_tray() -> Result<()> {
         }
     });
 
+    // The readings are polled on a thread of their own and this one only copies
+    // the strings into the menu. A WMI connection made on the thread that owns
+    // the tray icon does not work: the tray initialises COM there as a
+    // single-threaded apartment, and queries on a connection made afterwards
+    // return nothing while the connection itself appears to open.
+    let published = spawn_poller();
+
     // Disabled items: a native menu has no other way to show a line of text, and
     // greyed out is also the honest look for something that is a reading rather
     // than a command.
     let lines: Vec<MenuItem> = (0..READING_LINES)
         .map(|_| MenuItem::new("…", false, None))
         .collect();
-    let quit = MenuItem::new("Снять вооружение и выйти", true, None);
+    let quit = MenuItem::new("Выход", true, None);
 
     let menu = Menu::new();
     for line in &lines {
@@ -616,26 +611,20 @@ fn run_in_tray() -> Result<()> {
         .with_tooltip("msi-hotkeys")
         .build()?;
 
-    let machine = Machine::open()?;
-    let mut next_refresh = Instant::now();
+    let mut shown = Published::default();
 
     loop {
         pump_messages();
 
-        if Instant::now() >= next_refresh {
-            let ec = machine.read();
-            let power = machine.power();
-            for (item, text) in lines.iter().zip(readings(&ec, power.as_ref())) {
+        // Copying strings, so this can run often; the cost is on the polling
+        // thread, which sets its own pace.
+        let latest = published.lock().unwrap().clone();
+        if latest != shown {
+            for (item, text) in lines.iter().zip(&latest.lines) {
                 item.set_text(text);
             }
-            let _ = tray.set_tooltip(Some(format!(
-                "msi-hotkeys — {}",
-                summary(&ec, power.as_ref())
-            )));
-            // A second, not longer: the menu is drawn from these strings when it
-            // opens, and the library shows it before we see the click, so this
-            // interval is how stale the first glance can be.
-            next_refresh = Instant::now() + Duration::from_secs(1);
+            let _ = tray.set_tooltip(Some(format!("msi-hotkeys — {}", latest.tooltip)));
+            shown = latest;
         }
 
         while let Ok(event) = MenuEvent::receiver().try_recv() {
@@ -647,6 +636,49 @@ fn run_in_tray() -> Result<()> {
 
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+/// What the polling thread hands to the tray: the menu lines and the tooltip,
+/// already formatted.
+#[derive(Clone, Default, PartialEq, Eq)]
+struct Published {
+    lines: Vec<String>,
+    tooltip: String,
+}
+
+/// Reads the machine once a second on a thread of its own and publishes the
+/// formatted result. The menu never touches WMI.
+fn spawn_poller() -> Arc<Mutex<Published>> {
+    let published = Arc::new(Mutex::new(Published {
+        lines: vec!["…".to_string(); READING_LINES],
+        tooltip: "читаю…".to_string(),
+    }));
+
+    let writer = Arc::clone(&published);
+    std::thread::spawn(move || {
+        let machine = match Machine::open() {
+            Ok(machine) => machine,
+            Err(e) => {
+                let mut published = writer.lock().unwrap();
+                published.lines = vec![format!("{e:#}")];
+                published.tooltip = format!("{e:#}");
+                return;
+            }
+        };
+
+        loop {
+            let ec = machine.read();
+            let power = machine.power();
+            let next = Published {
+                lines: readings(&ec, power.as_ref()).to_vec(),
+                tooltip: summary(&ec, power.as_ref()),
+            };
+            *writer.lock().unwrap() = next;
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    });
+
+    published
 }
 
 /// A tray icon drawn rather than shipped: a disc with a dark hub, which reads at
