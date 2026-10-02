@@ -99,6 +99,28 @@ const GPU_TEMPERATURE: Byte = Byte { class: "MSI_VGA", property: "VGA", index: 1
 /// `MSI_Master_Battery` carries 16-bit words, not bytes: EC `0x31` holds the
 /// status bits and the rest are low/high pairs from `0x38` up.
 const BATTERY_FLAGS: Byte = Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 0 };
+/// EC `0x2E` holds the state of the wireless parts and `0x2F` says which of them
+/// the machine has at all; the bit numbers are msi-laptop's. The pair is worth
+/// showing because the camera bit is the only indication the machine gives that
+/// the camera has been switched off in firmware.
+const DEVICE_STATE: Byte = Byte { class: "MSI_Device", property: "Device", index: 0 };
+const DEVICE_PRESENT: Byte = Byte { class: "MSI_Device", property: "Device", index: 1 };
+const DEVICES: [(i64, &str); 4] = [
+    (1 << 0, "Bluetooth"),
+    (1 << 1, "камера"),
+    (1 << 3, "WLAN"),
+    (1 << 4, "3G"),
+];
+
+/// EC `0x4E` bit 1, which msi-laptop calls Turbo. `MSI_System[0]` is the low
+/// three bits of that byte, so the flag sits at bit 1 of the value read.
+const TURBO: Byte = Byte { class: "MSI_System", property: "System", index: 0 };
+
+/// `MSI_Software[6…33]` is the 28-byte firmware version string, which the
+/// mainline documentation of `Get_EC()` describes with the same shape.
+const FIRMWARE_FROM: usize = 6;
+const FIRMWARE_LEN: usize = 28;
+
 const BATTERY_PERCENT: Byte =
     Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 6 };
 const BATTERY_FULL: Byte = Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 7 };
@@ -427,11 +449,18 @@ struct Power {
 }
 
 /// How many lines the tray menu shows.
-const READING_LINES: usize = 9;
+const READING_LINES: usize = 11;
 
 /// The readings as separate lines, for the tray menu. In Russian, like
 /// everything else the user sees; the console and the log stay in English.
 fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
+    let [channel, cpu, gpu, fan, mode, devices] = machine_readings(ec);
+    let [source, charge, battery, capacity, state] = power_readings(ec, power);
+    [channel, cpu, gpu, fan, mode, devices, source, charge, battery, capacity, state]
+}
+
+/// The six lines about the machine itself.
+fn machine_readings(ec: &Ec) -> [String; 6] {
     // One value per line, and always the same lines: a menu that changes shape
     // depending on what answered is harder to read than one with a dash in it.
     let dash = |label: &str| format!("{label}: —");
@@ -470,6 +499,39 @@ fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
                 |value| format!("Вентилятор: {value}{mode}"),
             )
         },
+        match ec.byte(&TURBO) {
+            Some(value) if value & 0b10 != 0 => "Режим: Turbo".to_string(),
+            Some(_) => "Режим: обычный".to_string(),
+            None => dash("Режим"),
+        },
+        // Only the parts the machine actually has, each with its state.
+        match (ec.byte(&DEVICE_STATE), ec.byte(&DEVICE_PRESENT)) {
+            (Some(state), Some(present)) => {
+                let listed: Vec<String> = DEVICES
+                    .iter()
+                    .filter(|(mask, _)| present & mask != 0)
+                    .map(|(mask, name)| {
+                        let on = if state & mask == 0 { "выкл" } else { "вкл" };
+                        format!("{name} {on}")
+                    })
+                    .collect();
+                if listed.is_empty() {
+                    dash("Устройства")
+                } else {
+                    format!("Устройства: {}", listed.join(" · "))
+                }
+            }
+            _ => dash("Устройства"),
+        },
+    ]
+}
+
+/// The five lines about power. They come from the controller, with the
+/// Windows figures as a fallback where it has one.
+fn power_readings(ec: &Ec, power: Option<&Power>) -> [String; 5] {
+    let dash = |label: &str| format!("{label}: —");
+
+    [
         power.map_or_else(
             || dash("Питание"),
             |power| {
@@ -587,6 +649,34 @@ fn summary(ec: &Ec, power: Option<&Power>) -> String {
         "no readings".to_string()
     } else {
         facts.join("  ")
+    }
+}
+
+/// The controller's firmware version, which lives in `MSI_Software` as 28 bytes
+/// of ASCII: the name, then the build date and time run together.
+fn firmware_version(ec: &Ec) -> Option<String> {
+    let window = ec.window("MSI_Software")?;
+    let bytes = window.get(FIRMWARE_FROM..FIRMWARE_FROM + FIRMWARE_LEN)?;
+
+    let text: String = bytes
+        .iter()
+        .filter_map(|value| u8::try_from(*value).ok())
+        .filter(u8::is_ascii_graphic)
+        .map(char::from)
+        .collect();
+
+    // 1796EMS1.104 02232016 13:46:38 — name, date, time, with no separators.
+    if text.len() == FIRMWARE_LEN {
+        Some(format!(
+            "{} · {} · {}",
+            &text[..12],
+            &text[12..20],
+            &text[20..]
+        ))
+    } else if text.is_empty() {
+        None
+    } else {
+        Some(text)
     }
 }
 
@@ -852,6 +942,9 @@ fn status_screen(machine: &Machine) -> Result<()> {
         );
         println!();
         println!("  {}", summary(&ec, machine.power().as_ref()));
+        if let Some(firmware) = firmware_version(&ec) {
+            println!("  EC firmware: {firmware}");
+        }
         println!(
             "  channel: {}",
             match ec.armed() {
