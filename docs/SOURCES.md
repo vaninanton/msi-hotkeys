@@ -4,7 +4,8 @@
 
 ## 1. drivers/platform/x86/msi-wmi.c (майнлайн)
 
-Копия рядом: [msi-wmi.c](msi-wmi.c). Таблица скан-кодов кнопок. Младший байт
+[Исходник](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/platform/x86/msi-wmi.c),
+GPL-2.0, копии в этом репозитории нет. Таблица скан-кодов кнопок. Младший байт
 нашего кода совпадает с её значениями, отсюда имена тачпада (`0x08`, Fn+F3) и
 камеры (`0x57`, Fn+F6). GUID события совпадает дословно.
 

@@ -361,6 +361,12 @@ cargo fmt
 |---|---|
 | [acpi/decode-ec-fields.ps1](tools/acpi/decode-ec-fields.ps1) | достаёт карту полей EC из DSDT машины |
 | [acpi/decode-wmi-blocks.ps1](tools/acpi/decode-wmi-blocks.ps1) | показывает, из каких полей EC состоит каждое окно `MSI_*` |
+| [acpi/block-map.ps1](tools/acpi/block-map.ps1) | разбирает блок `_WDG`: GUID → идентификатор объекта |
+
+Таблицы ACPI в репозитории нет: это прошивка MSI, распространять её незачем.
+Запустите первым `decode-ec-fields.ps1` — он сам выгрузит `dsdt.aml` из реестра
+(`HKLM\HARDWARE\ACPI\DSDT\...`, без повышения прав), после чего остальные два
+скрипта найдут файл рядом с собой.
 | [poll-ec.ps1](tools/poll-ec.ps1) | непрерывный опрос всех байт EC, показывает только изменившиеся |
 | [probe-msi-events.ps1](tools/probe-msi-events.ps1) | снять код одной кнопки с меткой, пишет в `tools/codes.csv` |
 | [arming-experiment.ps1](tools/arming-experiment.ps1) | снимки всех `MSI_*` при работающей и остановленной службе |
