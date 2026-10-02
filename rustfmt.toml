@@ -1,0 +1,2 @@
+# Defaults, stated so that a stable toolchain and a nightly one format alike.
+edition = "2021"

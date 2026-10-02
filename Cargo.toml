@@ -2,7 +2,14 @@
 name = "msi-hotkeys"
 version = "0.1.0"
 edition = "2021"
-description = "Handler for the hardware buttons of an MSI GL72, replacing SCM.exe"
+rust-version = "1.82"
+description = "Handler for the hardware buttons of an MSI GL72 6QD, replacing the MSI SCM software"
+repository = "https://github.com/vaninanton/msi-hotkeys"
+license = "MIT"
+readme = "README.md"
+keywords = ["msi", "acpi", "wmi", "laptop", "hotkeys"]
+categories = ["os::windows-apis"]
+# Nothing to publish to crates.io: this is a binary for one family of machines.
 publish = false
 
 [dependencies]
@@ -11,9 +18,39 @@ chrono = "0.4.45"
 serde = { version = "1.0.229", features = ["derive"] }
 tauri-winrt-notification = "0.8.1"
 tray-icon = "0.26.0"
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Console", "Win32_System_Threading", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }
 wmi = "0.18.4"
 
+[build-dependencies]
+winresource = "0.1.23"
+
 [profile.release]
-lto = "thin"
+lto = true
+codegen-units = 1
 strip = true
+# The program has no state worth unwinding for, and a panic in the poller or the
+# handler thread should take the process down rather than leave it half-running
+# with the channel armed.
+panic = "abort"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# The Windows API is full of casts and wide signatures; these two fire on glue
+# code where the alternative is noisier than the cast.
+cast_possible_truncation = "allow"
+missing_errors_doc = "allow"
+# It wants map_or_else wherever a match on an Option has two arms. Where the arms
+# are short that reads well and the code uses it; where they are not a match is
+# plainer, and this lint cannot tell the two cases apart.
+option_if_let_else = "allow"

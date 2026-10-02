@@ -1,0 +1,4 @@
+# A single downloadable exe should not need the VC++ Redistributable installed,
+# so the CRT is linked in rather than loaded from vcruntime140.dll.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
