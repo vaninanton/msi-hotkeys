@@ -84,8 +84,45 @@ const CPU_TEMPERATURE: Byte = Byte {
     index: 1,
 };
 
-/// `MSI_AP[2]` is the fan tachometer. It never holds still, and its unit is
-/// unknown, so it is reported as it reads.
+/// Named from the machine's own DSDT: `_WDG` maps each block to an object id,
+/// the firmware's `WQ<id>` method lists the EC fields the block hands out, and
+/// the EC region declares those fields by name. So these are the firmware
+/// author's own addresses, not inferences from observed values. The decoding
+/// tools are in tools/acpi; the map is docs/EC-MAP.md.
+///
+/// Where an address also appears in Linux' msi-ec or msi-laptop, the two agree:
+/// `0x68` CPU temperature, `0x71` CPU fan, `0x80` GPU temperature, `0x89` GPU
+/// fan, `0x33` bit 0 the fan automatics.
+const FAN_AUTOMATICS: Byte = Byte { class: "MSI_CPU", property: "CPU", index: 0 };
+const CPU_FAN: Byte = Byte { class: "MSI_CPU", property: "CPU", index: 2 };
+const GPU_TEMPERATURE: Byte = Byte { class: "MSI_VGA", property: "VGA", index: 1 };
+const GPU_FAN: Byte = Byte { class: "MSI_VGA", property: "VGA", index: 2 };
+
+/// `MSI_Master_Battery` carries 16-bit words, not bytes: EC `0x31` holds the
+/// status bits and the rest are low/high pairs from `0x38` up.
+const BATTERY_FLAGS: Byte = Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 0 };
+const BATTERY_PERCENT: Byte =
+    Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 6 };
+const BATTERY_FULL: Byte = Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 7 };
+/// Signed: negative while discharging. This is the value whose sign used to
+/// shift the whole window, because the reader dropped anything negative.
+const BATTERY_CURRENT: Byte =
+    Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 8 };
+const BATTERY_LEFT: Byte = Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 9 };
+const BATTERY_VOLTAGE_WORD: Byte =
+    Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 10 };
+const BATTERY_TEMPERATURE: Byte =
+    Byte { class: "MSI_Master_Battery", property: "Master_Battery", index: 11 };
+
+/// `MSI_Software[0]` is EC `0x2D` bit 0 — the flag Linux' msi-laptop calls
+/// `MSI_STANDARD_EC_SCM_LOAD`, "set SCM load flag to disable BIOS fn key". The
+/// gate this project went looking for is that documented bit, reached through
+/// this window.
+///
+/// `MSI_AP[2]` is the fan tachometer by behaviour. Its address decodes as EC
+/// `0xCD`, which no source names, and the rest of that block does not line up
+/// with the named fields, so the AP mapping is the one part of the map not to
+/// be trusted yet. The unit is unknown either way, so it is reported raw.
 const FAN: Byte = Byte {
     class: "MSI_AP",
     property: "AP",
@@ -235,20 +272,20 @@ impl Machine {
     /// the instances are sorted by the index in their name; comparing these
     /// windows by position instead of by instance once produced a false lead,
     /// see docs/FINDINGS.md.
-    fn read_window(&self, class: &str, property: &str) -> Option<Vec<u64>> {
+    fn read_window(&self, class: &str, property: &str) -> Option<Vec<i64>> {
         let rows: Vec<HashMap<String, Variant>> = self
             .wmi
             .raw_query(format!("SELECT InstanceName, {property} FROM {class}"))
             .ok()?;
 
-        let mut indexed: Vec<(u32, u64)> = rows
+        let mut indexed: Vec<(u32, i64)> = rows
             .iter()
             .filter_map(|row| {
                 let Some(Variant::String(name)) = row.get("InstanceName") else {
                     return None;
                 };
                 let index = name.rsplit('_').next()?.parse().ok()?;
-                Some((index, as_u64(row.get(property)?)?))
+                Some((index, as_i64(row.get(property)?)?))
             })
             .collect();
         indexed.sort_unstable();
@@ -319,18 +356,18 @@ impl Machine {
 /// names. Everything is optional because a window can be unreadable without
 /// that being fatal.
 struct Ec {
-    windows: Vec<(&'static str, Option<Vec<u64>>)>,
+    windows: Vec<(&'static str, Option<Vec<i64>>)>,
 }
 
 impl Ec {
-    fn window(&self, class: &str) -> Option<&[u64]> {
+    fn window(&self, class: &str) -> Option<&[i64]> {
         self.windows
             .iter()
             .find(|(name, _)| *name == class)
             .and_then(|(_, values)| values.as_deref())
     }
 
-    fn byte(&self, byte: &Byte) -> Option<u64> {
+    fn byte(&self, byte: &Byte) -> Option<i64> {
         self.window(byte.class)?.get(byte.index).copied()
     }
 
@@ -341,13 +378,13 @@ impl Ec {
     /// A zero is not a stopped fan: the idle reading held 77 for thirty-six
     /// consecutive samples, and the zeros turn up as single samples between
     /// non-zero neighbours, so they are the register being read mid-update.
-    fn fan(&self) -> Option<u64> {
+    fn fan(&self) -> Option<i64> {
         self.byte(&FAN).filter(|value| *value != 0)
     }
 
     /// Temperature points paired with the fan value for each, as the controller
     /// holds them: instances 5..10 are the temperatures and 12..17 the values.
-    fn curve(&self, class: &str) -> Vec<(u64, u64)> {
+    fn curve(&self, class: &str) -> Vec<(i64, i64)> {
         let Some(window) = self.window(class) else {
             return Vec::new();
         };
@@ -391,9 +428,8 @@ struct Power {
     percent: Option<u16>,
 }
 
-/// How many lines the tray menu shows: the channel, two EC readings and three
-/// about power.
-const READING_LINES: usize = 6;
+/// How many lines the tray menu shows.
+const READING_LINES: usize = 10;
 
 /// The readings as separate lines, for the tray menu. In Russian, like
 /// everything else the user sees; the console and the log stay in English.
@@ -408,10 +444,28 @@ fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
             Some(false) => "Канал: не вооружён".to_string(),
             None => dash("Канал"),
         },
-        ec.byte(&CPU_TEMPERATURE)
-            .map_or_else(|| dash("CPU"), |value| format!("CPU: {value} °C")),
+        match (ec.byte(&CPU_TEMPERATURE), ec.byte(&CPU_FAN)) {
+            (Some(t), Some(f)) => format!("CPU: {t} °C · вентилятор {f}"),
+            (Some(t), None) => format!("CPU: {t} °C"),
+            _ => dash("CPU"),
+        },
+        // The discrete card is powered down at idle, and then its temperature
+        // reads zero rather than being absent.
+        match (ec.byte(&GPU_TEMPERATURE), ec.byte(&GPU_FAN)) {
+            (Some(0), _) => "GPU: спит".to_string(),
+            (Some(t), Some(f)) => format!("GPU: {t} °C · вентилятор {f}"),
+            (Some(t), None) => format!("GPU: {t} °C"),
+            _ => dash("GPU"),
+        },
+        // EC 0x33 bit 0, which msi-laptop documents as the fan automatics:
+        // zero means the controller drives the fan flat out.
+        match ec.byte(&FAN_AUTOMATICS) {
+            Some(value) if value & 1 == 0 => "Вентилятор: на максимуме".to_string(),
+            Some(_) => "Вентилятор: по кривой".to_string(),
+            None => dash("Вентилятор"),
+        },
         ec.fan()
-            .map_or_else(|| dash("Вентилятор"), |value| format!("Вентилятор: {value}")),
+            .map_or_else(|| dash("Тахометр"), |value| format!("Тахометр: {value}")),
         power.map_or_else(
             || dash("Питание"),
             |power| {
@@ -421,22 +475,80 @@ fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
                 )
             },
         ),
-        power.and_then(|power| power.percent).map_or_else(
-            || dash("Заряд"),
-            |percent| {
-                let flow = match power {
-                    Some(power) if power.charging => " · заряжается",
-                    Some(power) if power.discharging => " · разряжается",
-                    _ => "",
-                };
-                format!("Заряд: {percent} %{flow}")
-            },
-        ),
-        power.map_or_else(
-            || dash("Напряжение"),
-            |power| format!("Напряжение: {:.2} В", power.volts),
-        ),
+        // Percentage and current come from the controller; Windows agrees to
+        // within a point, and the current carries the sign that says which way
+        // the charge is going.
+        match (
+            ec.byte(&BATTERY_PERCENT)
+                .or_else(|| power.and_then(|p| p.percent).map(i64::from)),
+            ec.byte(&BATTERY_CURRENT),
+        ) {
+            (Some(percent), Some(current)) if current != 0 => {
+                format!("Заряд: {percent} % · {current} мА")
+            }
+            (Some(percent), _) => format!("Заряд: {percent} %"),
+            _ => dash("Заряд"),
+        },
+        // Battery figures straight from the controller, where the kernel's own
+        // field names say what they are: MVO the voltage, MTE the temperature in
+        // tenths of a kelvin, MRC and MFC the remaining and full capacity.
+        match (
+            ec.byte(&BATTERY_VOLTAGE_WORD),
+            ec.byte(&BATTERY_TEMPERATURE),
+        ) {
+            (Some(mv), Some(raw)) => format!(
+                "Батарея: {:.2} В · {:.1} °C",
+                millivolts(mv),
+                kelvin_tenths(raw)
+            ),
+            (Some(mv), None) => format!("Батарея: {:.2} В", millivolts(mv)),
+            _ => power.map_or_else(
+                || dash("Батарея"),
+                |power| format!("Батарея: {:.2} В", power.volts),
+            ),
+        },
+        // The unit is not established, so the two figures are shown as they read
+        // and only their ratio is meaningful.
+        match (ec.byte(&BATTERY_LEFT), ec.byte(&BATTERY_FULL)) {
+            (Some(left), Some(full)) if full > 0 => {
+                format!("Ёмкость: {left} из {full} мА·ч")
+            }
+            _ => dash("Ёмкость"),
+        },
+        match ec.byte(&BATTERY_FLAGS) {
+            Some(flags) => {
+                let mut state = Vec::new();
+                if flags & 0x01 != 0 {
+                    state.push("установлена");
+                }
+                if flags & 0x02 != 0 {
+                    state.push("заряжается");
+                }
+                if flags & 0x04 != 0 {
+                    state.push("разряжается");
+                }
+                if flags & 0x08 != 0 {
+                    state.push("заряжена");
+                }
+                if state.is_empty() {
+                    dash("Состояние")
+                } else {
+                    format!("Состояние: {}", state.join(" · "))
+                }
+            }
+            None => dash("Состояние"),
+        },
     ]
+}
+
+/// EC words are 16-bit, so the conversions go through f64 without a narrowing
+/// cast: a reading wider than expected should look wrong, not silently wrap.
+fn millivolts(value: i64) -> f64 {
+    f64::from(i32::try_from(value).unwrap_or(i32::MAX)) / 1000.0
+}
+
+fn kelvin_tenths(value: i64) -> f64 {
+    f64::from(i32::try_from(value).unwrap_or(i32::MAX)) / 10.0 - 273.15
 }
 
 /// The machine in one line, from a reading already taken.
@@ -481,16 +593,18 @@ fn button_name(code: u32) -> &'static str {
         .map_or("unidentified", |(_, name)| *name)
 }
 
-fn as_u64(value: &Variant) -> Option<u64> {
+fn as_i64(value: &Variant) -> Option<i64> {
     // The windows are all UInt8 in the MOF, but the batteries are wider, so the
     // integer kinds are flattened rather than assumed.
     Some(match value {
-        Variant::UI1(n) => u64::from(*n),
-        Variant::UI2(n) => u64::from(*n),
-        Variant::UI4(n) => u64::from(*n),
-        Variant::UI8(n) => *n,
-        Variant::I2(n) => u64::try_from(*n).ok()?,
-        Variant::I4(n) => u64::try_from(*n).ok()?,
+        Variant::UI1(n) => i64::from(*n),
+        Variant::UI2(n) => i64::from(*n),
+        Variant::UI4(n) => i64::from(*n),
+        Variant::UI8(n) => i64::try_from(*n).ok()?,
+        Variant::I1(n) => i64::from(*n),
+        Variant::I2(n) => i64::from(*n),
+        Variant::I4(n) => i64::from(*n),
+        Variant::I8(n) => *n,
         _ => return None,
     })
 }
