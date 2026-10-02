@@ -14,18 +14,23 @@
 //!
 //! Two devices turn up under a pair of codes each, and in both pairs the two
 //! differ by exactly bit 1 of that middle byte: `0x220208` against `0x220008`
-//! for the touchpad, `0x224B57` against `0x224957` for the camera. So the middle
-//! byte carries something stateful rather than an index. Which value means on is
-//! not established — see docs/FINDINGS.md.
+//! for the touchpad, `0x224B57` against `0x224957` for the camera. For the camera
+//! the middle byte is a snapshot of EC `0x2E`, the device-state byte, confirmed
+//! by six presses against the live byte. For the touchpad it is something else
+//! again — see docs/FINDINGS.md.
 
 /// Every button seen to raise an event, with the name where there is one. A
 /// device that appears under two codes is listed twice rather than masked: the
 /// meaning of the differing bit is still a guess, and a mask would bake it in.
-pub const ALL: [(u32, &str); 10] = [
+pub const ALL: [(u32, &str); 11] = [
     (0x22_0004, "Cooler Boost"),
     (0x22_0029, "Center key"), // "MSI M-Center main menu" in the kernel
     (0x22_0021, "Volume down"),
     (0x22_0032, "Volume up"),
+    // Not in the kernel's table at all. MSI's own software treats it as "launch
+    // the user's application", and nothing in hardware responds to it, so it is
+    // the natural key to map in actions.txt.
+    (0x22_006F, "P1 (Fn+F4)"),
     (0x22_0062, "Brightness up"),
     (0x22_0063, "Brightness down"),
     (0x22_0208, "Touchpad (Fn+F3)"),
@@ -35,7 +40,9 @@ pub const ALL: [(u32, &str); 10] = [
 ];
 
 /// The key next to the power button. It does nothing in hardware, which makes it
-/// the one free button here, so it gets the fallback behaviour.
+/// a free button, so it gets the fallback behaviour. P1 is free in the same sense
+/// but has no fallback: one key reporting the machine is enough, and P1 is the
+/// one the user is expected to map.
 pub const CENTER: u32 = 0x22_0029;
 
 pub fn name(code: u32) -> &'static str {

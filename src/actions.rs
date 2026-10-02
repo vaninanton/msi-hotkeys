@@ -17,7 +17,12 @@ const TEMPLATE: &str = "\
 #
 # Mind that the handler runs elevated, and whatever it starts inherits that.
 #
-# 0x220029 = wt.exe
+# Two keys are free, in the sense that the hardware does nothing with them:
+#
+#   0x22006F  the key marked P1 (Fn+F4), which is what MSI reserved for this
+#   0x220029  the key next to the power button
+#
+# 0x22006F = wt.exe
 ";
 
 /// Reads the map, or an empty one if the file is missing.
