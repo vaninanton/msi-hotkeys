@@ -7,15 +7,21 @@
 //! source. Like the volume keys, both are left alone: the firmware has already
 //! acted by the time the event arrives.
 //!
-//! The codes are not all of the form `0x2200NN` — `0x220208`, `0x224957` and
-//! `0x224B57` carry something in the middle byte too. The names come from the
-//! scancode table in Linux' `msi-wmi.c`, which is keyed by our low byte: `0x08`
-//! is `WIND_KEY_TOUCHPAD` ("Fn+F3 touchpad toggle") and `0x57` is
-//! `WIND_KEY_CAMERA` ("Fn+F6 webcam toggle"). The camera appears under two codes
-//! differing only in that middle byte, most likely on against off.
+//! The codes are not all of the form `0x2200NN`: some carry something in the
+//! middle byte too. The low byte matches the scancode table in Linux'
+//! `msi-wmi.c` — `0x08` is `WIND_KEY_TOUCHPAD` ("Fn+F3 touchpad toggle") and
+//! `0x57` is `WIND_KEY_CAMERA` ("Fn+F6 webcam toggle").
+//!
+//! Two devices turn up under a pair of codes each, and in both pairs the two
+//! differ by exactly bit 1 of that middle byte: `0x220208` against `0x220008`
+//! for the touchpad, `0x224B57` against `0x224957` for the camera. So the middle
+//! byte carries something stateful rather than an index. Which value means on is
+//! not established — see docs/FINDINGS.md.
 
-/// Every button seen to raise an event, with the name where there is one.
-pub const ALL: [(u32, &str); 9] = [
+/// Every button seen to raise an event, with the name where there is one. A
+/// device that appears under two codes is listed twice rather than masked: the
+/// meaning of the differing bit is still a guess, and a mask would bake it in.
+pub const ALL: [(u32, &str); 10] = [
     (0x22_0004, "Cooler Boost"),
     (0x22_0029, "Center key"), // "MSI M-Center main menu" in the kernel
     (0x22_0021, "Volume down"),
@@ -23,6 +29,7 @@ pub const ALL: [(u32, &str); 9] = [
     (0x22_0062, "Brightness up"),
     (0x22_0063, "Brightness down"),
     (0x22_0208, "Touchpad (Fn+F3)"),
+    (0x22_0008, "Touchpad (Fn+F3)"),
     (0x22_4957, "Camera (Fn+F6)"),
     (0x22_4B57, "Camera (Fn+F6)"),
 ];
