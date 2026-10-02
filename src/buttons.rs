@@ -24,6 +24,10 @@
 /// device that appears under two codes is listed twice rather than masked: the
 /// meaning of the differing bit is still a guess, and a mask would bake it in.
 pub const ALL: [(u32, &str); 13] = [
+    // A key of its own in the row beside the power button, not an Fn combination.
+    // The kernel's table has no code ending in 0x04, and the mute keys it does
+    // know sit in 0xD0..0xD4 — so nothing suggests this code is shared, but the
+    // machine's own mute key (Fn+Num0) has not been checked against it.
     (0x22_0004, "Cooler Boost"),
     (0x22_0029, "Center key"), // "MSI M-Center main menu" in the kernel
     (0x22_0021, "Volume down"),
