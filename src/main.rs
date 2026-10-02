@@ -75,29 +75,30 @@ const ARMING: Byte = Byte {
 };
 const ARMING_INSTANCE: &str = r"ACPI\PNP0C14\0_0";
 
-/// `MSI_CPU[1]` tracked the real temperature across a boost: it fell from 60 to
-/// 42 while the fan was at maximum and climbed back afterwards. A reading of
-/// behaviour, not of documentation.
+/// `MSI_CPU[1]` follows the CPU temperature in degrees. Named from behaviour,
+/// not from documentation.
 const CPU_TEMPERATURE: Byte = Byte {
     class: "MSI_CPU",
     property: "CPU",
     index: 1,
 };
 
-/// `MSI_AP[2]` is the fan tachometer, which is why it looked like noise for most
-/// of this project: it never holds still. Polled once a second it is
-/// unmistakable — it sat at 137..138 for forty seconds of audible Cooler Boost,
-/// slid down to 76 over thirteen seconds once the boost ended, then held 77 at
-/// idle. The raw unit is unknown, so it is reported as it reads.
+/// `MSI_AP[6]` moves on its own in a range that looks like a temperature, but
+/// what it measures is not established. Shown raw and labelled as unidentified,
+/// because that is the state of the knowledge about it.
+const UNNAMED_SENSOR: Byte = Byte {
+    class: "MSI_AP",
+    property: "AP",
+    index: 6,
+};
+
+/// `MSI_AP[2]` is the fan tachometer. It never holds still, and its unit is
+/// unknown, so it is reported as it reads.
 const FAN: Byte = Byte {
     class: "MSI_AP",
     property: "AP",
     index: 2,
 };
-
-/// Where the tachometer sits when Cooler Boost is on. The measured plateau was
-/// 137..138 against 77 at idle, so the threshold is well clear of both.
-const FAN_AT_MAXIMUM: u64 = 120;
 
 /// The classes that expose single-byte windows into EC RAM, and the property
 /// each one carries its value in.
@@ -398,6 +399,58 @@ struct Power {
     percent: Option<u16>,
 }
 
+/// How many lines the tray menu shows: the channel, three EC readings and three
+/// about power.
+const READING_LINES: usize = 7;
+
+/// The readings as separate lines, for the tray menu. In Russian, like
+/// everything else the user sees; the console and the log stay in English.
+fn readings(ec: &Ec, power: Option<&Power>) -> [String; READING_LINES] {
+    // One value per line, and always the same lines: a menu that changes shape
+    // depending on what answered is harder to read than one with a dash in it.
+    let dash = |label: &str| format!("{label}: —");
+
+    [
+        match ec.armed() {
+            Some(true) => "Канал: вооружён".to_string(),
+            Some(false) => "Канал: не вооружён".to_string(),
+            None => dash("Канал"),
+        },
+        ec.byte(&CPU_TEMPERATURE)
+            .map_or_else(|| dash("CPU"), |value| format!("CPU: {value} °C")),
+        ec.fan()
+            .map_or_else(|| dash("Вентилятор"), |value| format!("Вентилятор: {value}")),
+        ec.byte(&UNNAMED_SENSOR).map_or_else(
+            || dash("Датчик AP[6]"),
+            |value| format!("Датчик AP[6]: {value} — не определён"),
+        ),
+        power.map_or_else(
+            || dash("Питание"),
+            |power| {
+                format!(
+                    "Питание: {}",
+                    if power.on_mains { "от сети" } else { "от батареи" }
+                )
+            },
+        ),
+        power.and_then(|power| power.percent).map_or_else(
+            || dash("Заряд"),
+            |percent| {
+                let flow = match power {
+                    Some(power) if power.charging => " · заряжается",
+                    Some(power) if power.discharging => " · разряжается",
+                    _ => "",
+                };
+                format!("Заряд: {percent} %{flow}")
+            },
+        ),
+        power.map_or_else(
+            || dash("Напряжение"),
+            |power| format!("Напряжение: {:.2} В", power.volts),
+        ),
+    ]
+}
+
 /// The machine in one line, from a reading already taken.
 fn summary(ec: &Ec, power: Option<&Power>) -> String {
     let mut facts = Vec::new();
@@ -406,10 +459,9 @@ fn summary(ec: &Ec, power: Option<&Power>) -> String {
         facts.push(format!("CPU ~{value}C"));
     }
 
+    // Reported as it reads. The unit is unknown and the controller exposes no
+    // boost state, so any threshold here would be an interpretation, not a fact.
     facts.push(match ec.fan() {
-        Some(value) if value >= FAN_AT_MAXIMUM => {
-            format!("fan {value} (flat out — boost running)")
-        }
         Some(value) => format!("fan {value}"),
         None => "fan —".to_string(),
     });
@@ -543,11 +595,20 @@ fn run_in_tray() -> Result<()> {
         }
     });
 
-    let readings = MenuItem::new("reading…", false, None);
-    let quit = MenuItem::new("Disarm and quit", true, None);
+    // Disabled items: a native menu has no other way to show a line of text, and
+    // greyed out is also the honest look for something that is a reading rather
+    // than a command.
+    let lines: Vec<MenuItem> = (0..READING_LINES)
+        .map(|_| MenuItem::new("…", false, None))
+        .collect();
+    let quit = MenuItem::new("Снять вооружение и выйти", true, None);
 
     let menu = Menu::new();
-    menu.append_items(&[&readings, &PredefinedMenuItem::separator(), &quit])?;
+    for line in &lines {
+        menu.append(line)?;
+    }
+    menu.append(&PredefinedMenuItem::separator())?;
+    menu.append(&quit)?;
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
@@ -563,10 +624,18 @@ fn run_in_tray() -> Result<()> {
 
         if Instant::now() >= next_refresh {
             let ec = machine.read();
-            let status = summary(&ec, machine.power().as_ref());
-            let _ = tray.set_tooltip(Some(format!("msi-hotkeys — {status}")));
-            readings.set_text(&status);
-            next_refresh = Instant::now() + Duration::from_secs(2);
+            let power = machine.power();
+            for (item, text) in lines.iter().zip(readings(&ec, power.as_ref())) {
+                item.set_text(text);
+            }
+            let _ = tray.set_tooltip(Some(format!(
+                "msi-hotkeys — {}",
+                summary(&ec, power.as_ref())
+            )));
+            // A second, not longer: the menu is drawn from these strings when it
+            // opens, and the library shows it before we see the click, so this
+            // interval is how stale the first glance can be.
+            next_refresh = Instant::now() + Duration::from_secs(1);
         }
 
         while let Ok(event) = MenuEvent::receiver().try_recv() {
