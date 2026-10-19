@@ -56,38 +56,28 @@ fn machine_lines(ec: &Ec) -> [String; 6] {
             ec.bit(&map::TURBO, map::TURBO_BIT),
             ec.bit(&map::FUNCTIONS_HIGH, map::ECO_BIT),
         ) {
-            (Some(true), _) => "Режим: Turbo".to_string(),
-            (_, Some(true)) => "Режим: ECO".to_string(),
-            (Some(false), Some(false)) => "Режим: обычный".to_string(),
-            _ => dash("Режим"),
+            (Some(true), _) => "Профиль: Turbo".to_string(),
+            (_, Some(true)) => "Профиль: ECO".to_string(),
+            (Some(false), Some(false)) => "Профиль: обычный".to_string(),
+            _ => dash("Профиль"),
         },
         devices_line(ec),
     ]
 }
 
-/// The commanded fan duty from EC `0x71`, in the curve's own units, with Cooler
-/// Boost read off its effect: the boost register is not in any window, but the
-/// duty it sets is one specific value above the curve's ceiling.
+/// The measured fan speed, raw: ~75 at idle, ~135 under Cooler Boost, and no
+/// unit to put after it. Nothing else is claimed, because nothing else is known.
 ///
-/// An earlier version showed the tachometer instead and called it the fan, and
-/// labelled the `0x33` bit as "on the curve / flat out". The tachometer lags and
-/// has no known unit, and the bit is the controller's own thermal override,
-/// untouched by Cooler Boost — so that line was wrong in both halves at once.
+/// Two earlier versions claimed more. One labelled this number with the `0x33`
+/// bit as "on the curve / flat out" — that bit is the controller's own thermal
+/// override, untouched by Cooler Boost. The next showed EC `0x71` as a duty with
+/// "Cooler Boost" at 86, on the strength of press-time snapshots; a continuous
+/// recording then showed `0x71` sitting at 0 through a whole boost while this
+/// tachometer climbed, and no other byte in any window moving at all. So the
+/// boost state is not readable here, and the line says only what is.
 fn fan_line(ec: &Ec) -> String {
-    let Some(duty) = ec.fan_duty() else {
-        return dash("Вентилятор");
-    };
-
-    let mut line = format!("Вентилятор: {duty} %");
-    match (ec.cooler_boost(), ec.fan_above_curve()) {
-        (Some(true), _) => line.push_str(" · Cooler Boost"),
-        (_, Some(true)) => line.push_str(" · выше кривой"),
-        _ => {}
-    }
-    if let Some(gpu) = ec.byte(&map::GPU_FAN_DUTY).filter(|value| *value > 0) {
-        let _ = write!(line, " · GPU {gpu} %");
-    }
-    line
+    ec.fan_tach()
+        .map_or_else(|| dash("Вентилятор"), |tach| format!("Вентилятор: {tach}"))
 }
 
 /// Only the parts the machine actually has, each with its state. Worth showing
@@ -218,9 +208,10 @@ pub fn summary(ec: &Ec, power: Option<&Power>) -> String {
         facts.push(format!("CPU ~{value}C"));
     }
 
-    facts.push(match ec.fan_duty() {
-        Some(duty) if ec.cooler_boost() == Some(true) => format!("fan {duty}% boost"),
-        Some(duty) => format!("fan {duty}%"),
+    // Raw, as the menu shows it: the unit is unknown and there is no boost state
+    // to read, so a threshold here would be an interpretation.
+    facts.push(match ec.fan_tach() {
+        Some(tach) => format!("fan {tach}"),
         None => "fan —".to_string(),
     });
 
@@ -332,8 +323,8 @@ mod tests {
         assert_eq!(buttons, "Кнопки: у программы");
         assert_eq!(cpu, "CPU: 52 °C");
         assert_eq!(gpu, "GPU: спит");
-        assert_eq!(fan, "Вентилятор: 50 %");
-        assert_eq!(mode, "Режим: Turbo");
+        assert_eq!(fan, "Вентилятор: 137");
+        assert_eq!(mode, "Профиль: Turbo");
         assert_eq!(
             devices,
             "Устройства: Bluetooth вкл · камера выкл · WLAN вкл · тачпад вкл"
@@ -365,35 +356,25 @@ mod tests {
     }
 
     #[test]
-    fn names_cooler_boost_and_the_controllers_own_override_apart() {
-        let cpu = |duty: i64| {
-            (
-                "MSI_CPU",
-                Some(vec![
-                    13, 71, duty, 100, 0, 60, 65, 70, 75, 75, 75, 0, 50, 56, 66, 76, 76, 76,
-                ]),
-            )
-        };
-        let ec = Ec::from_windows(vec![cpu(86)]);
-        assert_eq!(fan_line(&ec), "Вентилятор: 86 % · Cooler Boost");
+    fn the_fan_line_claims_nothing_beyond_the_tachometer() {
+        // 0x71 at 86 and 0x33 cleared were both once taken for boost; neither
+        // may leak into the line now, whatever they read.
+        let ec = Ec::from_windows(vec![
+            ("MSI_AP", Some(vec![0, 20, 134])),
+            ("MSI_CPU", Some(vec![0x00, 71, 86, 100])),
+        ]);
+        assert_eq!(fan_line(&ec), "Вентилятор: 134");
 
-        let ec = Ec::from_windows(vec![cpu(100)]);
-        assert_eq!(fan_line(&ec), "Вентилятор: 100 % · выше кривой");
-
-        // The GPU fan appears only once it turns.
-        let ec = Ec::from_windows(vec![cpu(66), ("MSI_VGA", Some(vec![13, 61, 40, 100]))]);
-        assert_eq!(fan_line(&ec), "Вентилятор: 66 % · GPU 40 %");
-
-        // No curve to compare against: the duty alone, no claims.
-        let ec = Ec::from_windows(vec![("MSI_CPU", Some(vec![13, 71, 90, 100]))]);
-        assert_eq!(fan_line(&ec), "Вентилятор: 90 %");
+        // A mid-update zero in the tachometer is no reading, not a stopped fan.
+        let ec = Ec::from_windows(vec![("MSI_AP", Some(vec![0, 20, 0]))]);
+        assert_eq!(fan_line(&ec), "Вентилятор: —");
     }
 
     #[test]
     fn eco_shows_when_its_bit_is_set() {
         let ec = Ec::from_windows(vec![("MSI_System", Some(vec![0b000, 0b01]))]);
         let [_, _, _, _, mode, _] = machine_lines(&ec);
-        assert_eq!(mode, "Режим: ECO");
+        assert_eq!(mode, "Профиль: ECO");
     }
 
     #[test]
@@ -416,7 +397,7 @@ mod tests {
     fn summarises_in_one_line() {
         assert_eq!(
             summary(&ec(), Some(&on_battery())),
-            "CPU ~52C  fan 50%  on battery  discharging  11.42V  58%"
+            "CPU ~52C  fan 137  on battery  discharging  11.42V  58%"
         );
         assert_eq!(summary(&Ec::default(), None), "fan —");
     }

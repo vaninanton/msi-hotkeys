@@ -61,19 +61,18 @@ pub mod map {
     /// on the status screen only.
     pub const FAN_AUTOMATIC: Byte = Byte::new("MSI_CPU", "CPU", 0);
     pub const FAN_AUTOMATIC_BIT: i64 = 1 << 0;
-    /// EC `0x71`, what `msi-ec` exposes as the realtime CPU fan speed. It is the
-    /// commanded duty, in the same units as the curve: at 59 °C it reads 50, the
-    /// curve's floor, and under Cooler Boost it reads 86, above the curve's
-    /// ceiling of 76. Zeros are single mid-update samples, like the tachometer's.
-    pub const FAN_DUTY: Byte = Byte::new("MSI_CPU", "CPU", 2);
-    /// EC `0x70`: reads 100 at all times, the duty ceiling.
-    pub const FAN_DUTY_MAX: Byte = Byte::new("MSI_CPU", "CPU", 3);
-    /// EC `0x89`, the GPU fan's duty. Zero while the card is powered down.
-    pub const GPU_FAN_DUTY: Byte = Byte::new("MSI_VGA", "VGA", 2);
-    /// What Cooler Boost sets [`FAN_DUTY`] to on this firmware: 86, seen on
-    /// fourteen of the twenty-eight logged presses (the half that caught the
-    /// fan already boosted), never any other value above the curve.
-    pub const COOLER_BOOST_DUTY: i64 = 86;
+    /// EC `0x71`, what `msi-ec` exposes as the realtime CPU fan speed. Not on
+    /// this firmware: it holds a value from the curve's own set (0, 50, 56, 66,
+    /// 76, 86), flips between them on its own — 0 to 50 with no event, 25 s
+    /// before a Cooler Boost press that it then ignored entirely — and sat at 0
+    /// through a whole boost. It was read as the commanded duty for an hour on
+    /// the strength of press-time snapshots alone; a continuous recording
+    /// refuted that. Status screen only, as a raw byte of unknown meaning.
+    pub const FAN_BYTE_71: Byte = Byte::new("MSI_CPU", "CPU", 2);
+    /// EC `0x70`: reads 100 at all times.
+    pub const FAN_BYTE_70: Byte = Byte::new("MSI_CPU", "CPU", 3);
+    /// EC `0x89`, `0x71`'s counterpart for the GPU. Zero while the card sleeps.
+    pub const GPU_FAN_BYTE_89: Byte = Byte::new("MSI_VGA", "VGA", 2);
     /// EC `0xE4` bits 0..2 as one field; bit 1 is Turbo in `msi-laptop`.
     pub const TURBO: Byte = Byte::new("MSI_System", "System", 0);
     /// EC `0xE4` bits 3..7 as one field, so bit 0 here is `0xE4` bit 3 — ECO in
@@ -386,37 +385,16 @@ impl Ec {
         self.byte(&map::HANDOVER).map(|value| value == 1)
     }
 
-    /// The commanded CPU fan duty. A zero is not a stopped fan but the register
-    /// read mid-update: zeros arrive as single samples between steady non-zero
-    /// ones, in this byte and in the tachometer alike.
-    pub fn fan_duty(&self) -> Option<i64> {
-        self.byte(&map::FAN_DUTY).filter(|value| *value != 0)
-    }
-
-    /// The measured fan speed, raw and lagging; see [`map::FAN_TACH`].
+    /// The measured fan speed, the one live fan signal in the windows: ~75 at
+    /// idle, ~135 under Cooler Boost, ramping between over some twenty seconds.
+    /// A zero is not a stopped fan but the register read mid-update: zeros
+    /// arrive as single samples between steady non-zero ones.
+    ///
+    /// There is no boost flag to go with it. A continuous recording of all 107
+    /// bytes across a Cooler Boost press showed this byte moving and nothing
+    /// else, so the state cannot be read — only the fan's response to it.
     pub fn fan_tach(&self) -> Option<i64> {
         self.byte(&map::FAN_TACH).filter(|value| *value != 0)
-    }
-
-    /// Whether the fan is at the duty Cooler Boost sets. The boost register
-    /// itself (`0x98` in `msi-ec`) is not in any window, so the state is read off
-    /// its effect, and only that exact value counts: a duty above the curve for
-    /// any other reason — the controller's own thermal override — is not boost.
-    pub fn cooler_boost(&self) -> Option<bool> {
-        self.fan_duty().map(|duty| duty == map::COOLER_BOOST_DUTY)
-    }
-
-    /// Whether the duty is above the curve's ceiling, which is what both Cooler
-    /// Boost and the controller's thermal override do. `None` without a curve
-    /// to compare against.
-    pub fn fan_above_curve(&self) -> Option<bool> {
-        let duty = self.fan_duty()?;
-        let ceiling = self
-            .curve("MSI_CPU")
-            .iter()
-            .map(|(_, value)| *value)
-            .max()?;
-        Some(duty > ceiling)
     }
 
     /// Temperature points paired with the fan value the controller holds for
@@ -522,28 +500,6 @@ mod tests {
         assert_eq!(ec.byte(&map::CPU_TEMPERATURE), Some(49));
         assert_eq!(ec.byte(&map::GPU_TEMPERATURE), Some(0));
         assert_eq!(ec.fan_tach(), Some(137));
-        // The sample's MSI_CPU[2] is 0 — a mid-update zero — so no duty.
-        assert_eq!(ec.fan_duty(), None);
-        assert_eq!(ec.cooler_boost(), None);
-    }
-
-    #[test]
-    fn boost_is_the_one_duty_above_the_curve_that_counts() {
-        let with_duty = |duty: i64| {
-            Ec::from_windows(vec![(
-                "MSI_CPU",
-                Some(vec![
-                    13, 60, duty, 100, 0, 60, 65, 70, 75, 75, 75, 0, 50, 56, 66, 76, 76, 76,
-                ]),
-            )])
-        };
-        assert_eq!(with_duty(50).cooler_boost(), Some(false));
-        assert_eq!(with_duty(50).fan_above_curve(), Some(false));
-        assert_eq!(with_duty(86).cooler_boost(), Some(true));
-        assert_eq!(with_duty(86).fan_above_curve(), Some(true));
-        // Above the curve but not boost: the controller doing its own thing.
-        assert_eq!(with_duty(100).cooler_boost(), Some(false));
-        assert_eq!(with_duty(100).fan_above_curve(), Some(true));
     }
 
     #[test]
@@ -558,12 +514,8 @@ mod tests {
 
     #[test]
     fn a_zero_fan_reading_is_treated_as_no_reading() {
-        let ec = Ec::from_windows(vec![
-            ("MSI_AP", Some(vec![0, 20, 0, 0, 0, 0, 44, 0])),
-            ("MSI_CPU", Some(vec![13, 60, 0, 100])),
-        ]);
+        let ec = Ec::from_windows(vec![("MSI_AP", Some(vec![0, 20, 0, 0, 0, 0, 44, 0]))]);
         assert_eq!(ec.fan_tach(), None);
-        assert_eq!(ec.fan_duty(), None);
     }
 
     #[test]

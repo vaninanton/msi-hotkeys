@@ -51,19 +51,20 @@ pub fn status(machine: &Machine, identity: &Identity) -> Result<()> {
             }
         );
 
-        // The raw fan bytes, for the record: what the menu derives its line from
-        // and the two readings it deliberately leaves out.
+        // The raw fan-related bytes, for the record: the tachometer the menu
+        // shows, and the ones it deliberately leaves out because their meaning
+        // on this firmware is not established.
         let raw = |byte: &crate::ec::Byte| {
             ec.byte(byte)
                 .map_or_else(|| "—".to_string(), |value| format!("0x{value:02X}"))
         };
         println!(
-            "  fan: duty {} of {}, tach {}, auto bit {}, fan mode {}, shift mode {}",
-            ec.fan_duty()
-                .map_or_else(|| "—".to_string(), |duty| format!("{duty}%")),
-            raw(&map::FAN_DUTY_MAX),
+            "  fan: tach {}, 0x71 {} / 0x70 {} / 0x89 {}, auto bit {}, fan mode {}, shift mode {}",
             ec.fan_tach()
                 .map_or_else(|| "—".to_string(), |tach| tach.to_string()),
+            raw(&map::FAN_BYTE_71),
+            raw(&map::FAN_BYTE_70),
+            raw(&map::GPU_FAN_BYTE_89),
             ec.bit(&map::FAN_AUTOMATIC, map::FAN_AUTOMATIC_BIT)
                 .map_or_else(|| "—".to_string(), |set| u8::from(set).to_string()),
             raw(&map::FAN_MODE),
