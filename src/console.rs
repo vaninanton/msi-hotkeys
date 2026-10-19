@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 
-use crate::ec::Machine;
+use crate::ec::{map, Machine};
 use crate::model::Identity;
 use crate::{journal, readings, win};
 
@@ -49,6 +49,25 @@ pub fn status(machine: &Machine, identity: &Identity) -> Result<()> {
                 Some(false) => "left to the firmware — no events are raised",
                 None => "unreadable",
             }
+        );
+
+        // The raw fan bytes, for the record: what the menu derives its line from
+        // and the two readings it deliberately leaves out.
+        let raw = |byte: &crate::ec::Byte| {
+            ec.byte(byte)
+                .map_or_else(|| "—".to_string(), |value| format!("0x{value:02X}"))
+        };
+        println!(
+            "  fan: duty {} of {}, tach {}, auto bit {}, fan mode {}, shift mode {}",
+            ec.fan_duty()
+                .map_or_else(|| "—".to_string(), |duty| format!("{duty}%")),
+            raw(&map::FAN_DUTY_MAX),
+            ec.fan_tach()
+                .map_or_else(|| "—".to_string(), |tach| tach.to_string()),
+            ec.bit(&map::FAN_AUTOMATIC, map::FAN_AUTOMATIC_BIT)
+                .map_or_else(|| "—".to_string(), |set| u8::from(set).to_string()),
+            raw(&map::FAN_MODE),
+            raw(&map::SHIFT_MODE),
         );
 
         println!();

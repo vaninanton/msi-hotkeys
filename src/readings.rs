@@ -50,32 +50,44 @@ fn machine_lines(ec: &Ec) -> [String; 6] {
             None => dash("GPU"),
         },
         fan_line(ec),
-        match ec.bit(&map::TURBO, map::TURBO_BIT) {
-            Some(true) => "Режим: Turbo".to_string(),
-            Some(false) => "Режим: обычный".to_string(),
-            None => dash("Режим"),
+        // Both bits live in EC 0xE4 and both come with a power-LED colour in
+        // msi-laptop: orange for Turbo, green for ECO.
+        match (
+            ec.bit(&map::TURBO, map::TURBO_BIT),
+            ec.bit(&map::FUNCTIONS_HIGH, map::ECO_BIT),
+        ) {
+            (Some(true), _) => "Режим: Turbo".to_string(),
+            (_, Some(true)) => "Режим: ECO".to_string(),
+            (Some(false), Some(false)) => "Режим: обычный".to_string(),
+            _ => dash("Режим"),
         },
         devices_line(ec),
     ]
 }
 
-/// The fan value and, from the curve flag, whether the controller is following
-/// its curve — `msi-laptop` documents a zero there as the fan running flat out.
+/// The commanded fan duty from EC `0x71`, in the curve's own units, with Cooler
+/// Boost read off its effect: the boost register is not in any window, but the
+/// duty it sets is one specific value above the curve's ceiling.
 ///
-/// The two addresses `msi-ec` calls the real fan speeds, `0x71` for the CPU and
-/// `0x89` for the GPU, read zero on this machine even with Cooler Boost audibly
-/// running, so they are not shown: a number that is always zero is worse than no
-/// number.
+/// An earlier version showed the tachometer instead and called it the fan, and
+/// labelled the `0x33` bit as "on the curve / flat out". The tachometer lags and
+/// has no known unit, and the bit is the controller's own thermal override,
+/// untouched by Cooler Boost — so that line was wrong in both halves at once.
 fn fan_line(ec: &Ec) -> String {
-    let mode = match ec.bit(&map::FAN_CURVE_ACTIVE, map::FAN_CURVE_BIT) {
-        Some(false) => " · на максимуме",
-        Some(true) => " · по кривой",
-        None => "",
+    let Some(duty) = ec.fan_duty() else {
+        return dash("Вентилятор");
     };
-    ec.fan().map_or_else(
-        || format!("Вентилятор: —{mode}"),
-        |value| format!("Вентилятор: {value}{mode}"),
-    )
+
+    let mut line = format!("Вентилятор: {duty} %");
+    match (ec.cooler_boost(), ec.fan_above_curve()) {
+        (Some(true), _) => line.push_str(" · Cooler Boost"),
+        (_, Some(true)) => line.push_str(" · выше кривой"),
+        _ => {}
+    }
+    if let Some(gpu) = ec.byte(&map::GPU_FAN_DUTY).filter(|value| *value > 0) {
+        let _ = write!(line, " · GPU {gpu} %");
+    }
+    line
 }
 
 /// Only the parts the machine actually has, each with its state. Worth showing
@@ -206,10 +218,9 @@ pub fn summary(ec: &Ec, power: Option<&Power>) -> String {
         facts.push(format!("CPU ~{value}C"));
     }
 
-    // Reported as it reads: the unit is unknown and the controller exposes no
-    // boost state, so any threshold here would be an interpretation.
-    facts.push(match ec.fan() {
-        Some(value) => format!("fan {value}"),
+    facts.push(match ec.fan_duty() {
+        Some(duty) if ec.cooler_boost() == Some(true) => format!("fan {duty}% boost"),
+        Some(duty) => format!("fan {duty}%"),
         None => "fan —".to_string(),
     });
 
@@ -278,11 +289,17 @@ mod tests {
             ("MSI_AP", Some(vec![0, 20, 137])),
             // Bluetooth, camera and WLAN present, the camera switched off.
             ("MSI_Device", Some(vec![0x49, 0x4B, 0x80])),
-            // Bit 1 set: Turbo.
-            ("MSI_System", Some(vec![0b010])),
-            // Bit 0 set: following the curve.
-            ("MSI_CPU", Some(vec![0b01, 52])),
-            ("MSI_VGA", Some(vec![0, 0])),
+            // [0] bit 1 set: Turbo. [1] bit 0 clear: not ECO.
+            ("MSI_System", Some(vec![0b010, 0b10])),
+            // Temperature 52, duty 50, ceiling 100, then the curve.
+            (
+                "MSI_CPU",
+                Some(vec![
+                    13, 52, 50, 100, 0, 60, 65, 70, 75, 75, 75, 0, 50, 56, 66, 76, 76, 76,
+                ]),
+            ),
+            // Card asleep: temperature and fan both zero.
+            ("MSI_VGA", Some(vec![13, 0, 0, 100])),
             (
                 "MSI_Master_Battery",
                 Some(vec![5, 0, 0, 0, 0, 0, 58, 3532, -1952, 2040, 11420, 3092]),
@@ -315,7 +332,7 @@ mod tests {
         assert_eq!(buttons, "Кнопки: у программы");
         assert_eq!(cpu, "CPU: 52 °C");
         assert_eq!(gpu, "GPU: спит");
-        assert_eq!(fan, "Вентилятор: 137 · по кривой");
+        assert_eq!(fan, "Вентилятор: 50 %");
         assert_eq!(mode, "Режим: Turbo");
         assert_eq!(
             devices,
@@ -348,12 +365,35 @@ mod tests {
     }
 
     #[test]
-    fn says_so_when_the_fan_runs_flat_out() {
-        let ec = Ec::from_windows(vec![
-            ("MSI_AP", Some(vec![0, 20, 210])),
-            ("MSI_CPU", Some(vec![0b00, 71])),
-        ]);
-        assert_eq!(fan_line(&ec), "Вентилятор: 210 · на максимуме");
+    fn names_cooler_boost_and_the_controllers_own_override_apart() {
+        let cpu = |duty: i64| {
+            (
+                "MSI_CPU",
+                Some(vec![
+                    13, 71, duty, 100, 0, 60, 65, 70, 75, 75, 75, 0, 50, 56, 66, 76, 76, 76,
+                ]),
+            )
+        };
+        let ec = Ec::from_windows(vec![cpu(86)]);
+        assert_eq!(fan_line(&ec), "Вентилятор: 86 % · Cooler Boost");
+
+        let ec = Ec::from_windows(vec![cpu(100)]);
+        assert_eq!(fan_line(&ec), "Вентилятор: 100 % · выше кривой");
+
+        // The GPU fan appears only once it turns.
+        let ec = Ec::from_windows(vec![cpu(66), ("MSI_VGA", Some(vec![13, 61, 40, 100]))]);
+        assert_eq!(fan_line(&ec), "Вентилятор: 66 % · GPU 40 %");
+
+        // No curve to compare against: the duty alone, no claims.
+        let ec = Ec::from_windows(vec![("MSI_CPU", Some(vec![13, 71, 90, 100]))]);
+        assert_eq!(fan_line(&ec), "Вентилятор: 90 %");
+    }
+
+    #[test]
+    fn eco_shows_when_its_bit_is_set() {
+        let ec = Ec::from_windows(vec![("MSI_System", Some(vec![0b000, 0b01]))]);
+        let [_, _, _, _, mode, _] = machine_lines(&ec);
+        assert_eq!(mode, "Режим: ECO");
     }
 
     #[test]
@@ -376,7 +416,7 @@ mod tests {
     fn summarises_in_one_line() {
         assert_eq!(
             summary(&ec(), Some(&on_battery())),
-            "CPU ~52C  fan 137  on battery  discharging  11.42V  58%"
+            "CPU ~52C  fan 50%  on battery  discharging  11.42V  58%"
         );
         assert_eq!(summary(&Ec::default(), None), "fan —");
     }
