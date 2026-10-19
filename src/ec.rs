@@ -61,14 +61,17 @@ pub mod map {
     /// on the status screen only.
     pub const FAN_AUTOMATIC: Byte = Byte::new("MSI_CPU", "CPU", 0);
     pub const FAN_AUTOMATIC_BIT: i64 = 1 << 0;
-    /// EC `0x71`, what `msi-ec` exposes as the realtime CPU fan speed. Not on
-    /// this firmware: it holds a value from the curve's own set (0, 50, 56, 66,
-    /// 76, 86), flips between them on its own — 0 to 50 with no event, 25 s
-    /// before a Cooler Boost press that it then ignored entirely — and sat at 0
-    /// through a whole boost. It was read as the commanded duty for an hour on
-    /// the strength of press-time snapshots alone; a continuous recording
-    /// refuted that. Status screen only, as a raw byte of unknown meaning.
-    pub const FAN_BYTE_71: Byte = Byte::new("MSI_CPU", "CPU", 2);
+    /// EC `0x71`, what `msi-ec` exposes as the realtime CPU fan speed. On this
+    /// firmware it is the curve's output for the current temperature: 0 below
+    /// the first point, the point's value at and above it. Settled by writing —
+    /// lowering the first point below the current temperature made it read that
+    /// point's value within a second. It is a display figure, the one SCM drew
+    /// as "fan %": the fan did not move when it read 100. Status screen only.
+    ///
+    /// Before that it was read as "always zero", then as the commanded duty with
+    /// 86 meaning Cooler Boost, each on evidence too thin; the second lasted an
+    /// hour in the menu.
+    pub const CURVE_OUTPUT: Byte = Byte::new("MSI_CPU", "CPU", 2);
     /// EC `0x70`: reads 100 at all times.
     pub const FAN_BYTE_70: Byte = Byte::new("MSI_CPU", "CPU", 3);
     /// EC `0x89`, `0x71`'s counterpart for the GPU. Zero while the card sleeps.

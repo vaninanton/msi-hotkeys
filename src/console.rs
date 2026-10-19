@@ -62,7 +62,7 @@ pub fn status(machine: &Machine, identity: &Identity) -> Result<()> {
             "  fan: tach {}, 0x71 {} / 0x70 {} / 0x89 {}, auto bit {}, fan mode {}, shift mode {}",
             ec.fan_tach()
                 .map_or_else(|| "—".to_string(), |tach| tach.to_string()),
-            raw(&map::FAN_BYTE_71),
+            raw(&map::CURVE_OUTPUT),
             raw(&map::FAN_BYTE_70),
             raw(&map::GPU_FAN_BYTE_89),
             ec.bit(&map::FAN_AUTOMATIC, map::FAN_AUTOMATIC_BIT)
