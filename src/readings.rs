@@ -76,8 +76,16 @@ fn machine_lines(ec: &Ec) -> [String; 6] {
 /// tachometer climbed, and no other byte in any window moving at all. So the
 /// boost state is not readable here, and the line says only what is.
 fn fan_line(ec: &Ec) -> String {
-    ec.fan_tach()
-        .map_or_else(|| dash("Вентилятор"), |tach| format!("Вентилятор: {tach}"))
+    if let Some(tach) = ec.fan_tach() {
+        return format!("Вентилятор: {tach}");
+    }
+    // The controller stops the fan outright below the curve's first point. A
+    // tachometer at zero with the running bit clear is that, and worth saying;
+    // a zero with the bit still set is a mid-update sample, and a dash.
+    match ec.bit(&map::FAN_AUTOMATIC, map::FAN_RUNNING_BIT) {
+        Some(false) => "Вентилятор: остановлен".to_string(),
+        _ => dash("Вентилятор"),
+    }
 }
 
 /// Only the parts the machine actually has, each with its state. Worth showing
@@ -365,9 +373,20 @@ mod tests {
         ]);
         assert_eq!(fan_line(&ec), "Вентилятор: 134");
 
-        // A mid-update zero in the tachometer is no reading, not a stopped fan.
-        let ec = Ec::from_windows(vec![("MSI_AP", Some(vec![0, 20, 0]))]);
+        // A zero in the tachometer with the running bit still set is a
+        // mid-update sample, not a stopped fan: no reading.
+        let ec = Ec::from_windows(vec![
+            ("MSI_AP", Some(vec![0, 20, 0])),
+            ("MSI_CPU", Some(vec![0x0D, 45])),
+        ]);
         assert_eq!(fan_line(&ec), "Вентилятор: —");
+
+        // With the running bit clear it is a stopped fan, and says so.
+        let ec = Ec::from_windows(vec![
+            ("MSI_AP", Some(vec![0, 20, 0])),
+            ("MSI_CPU", Some(vec![0x05, 45])),
+        ]);
+        assert_eq!(fan_line(&ec), "Вентилятор: остановлен");
     }
 
     #[test]

@@ -61,6 +61,13 @@ pub mod map {
     /// on the status screen only.
     pub const FAN_AUTOMATIC: Byte = Byte::new("MSI_CPU", "CPU", 0);
     pub const FAN_AUTOMATIC_BIT: i64 = 1 << 0;
+    /// Bit 3 of the same byte: set while the fan turns. Seen four times with no
+    /// exception, once as a live transition — `0x05` with the tachometer at 0
+    /// for a hundred seconds, then `0x0D` in the same second the tachometer
+    /// jumped to 202. The controller stops the fan outright below the curve's
+    /// first point, and this is how a stopped fan is told from a mid-update
+    /// zero in the tachometer.
+    pub const FAN_RUNNING_BIT: i64 = 1 << 3;
     /// EC `0x71`, what `msi-ec` exposes as the realtime CPU fan speed. On this
     /// firmware it is the curve's output for the current temperature: 0 below
     /// the first point, the point's value at and above it. Settled by writing —
